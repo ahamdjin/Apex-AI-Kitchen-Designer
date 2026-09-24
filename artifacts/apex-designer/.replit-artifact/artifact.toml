@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Apex Kitchen Designer"
+description = "A measured kitchen intake and interactive design demo for Apex cabinet and countertop visitors, with a maintainable product catalog and pricing import."
+version = "1.0.0"
+id = "artifacts/apex-designer"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23321
+
+[services.development]
+run = "pnpm --filter @workspace/apex-designer run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/apex-designer", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/apex-designer/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23321"
+BASE_PATH = "/"

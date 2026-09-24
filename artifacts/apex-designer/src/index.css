@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Space+Mono&display=swap');
+
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-border: var(--primary-border);
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary-border: var(--secondary-border);
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-border: var(--muted-border);
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-border: var(--accent-border);
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-border: var(--destructive-border);
+
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: 60 5% 98%;
+  --foreground: 220 15% 20%;
+  --border: 220 15% 90%;
+  --input: 220 15% 90%;
+  --ring: 215 100% 50%;
+  
+  --card: 0 0% 100%;
+  --card-foreground: 220 15% 20%;
+  --card-border: 220 15% 90%;
+  
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 15% 20%;
+  --popover-border: 220 15% 90%;
+  
+  --primary: 215 100% 45%;
+  --primary-foreground: 0 0% 100%;
+  
+  --secondary: 220 10% 90%;
+  --secondary-foreground: 220 15% 25%;
+  
+  --muted: 220 15% 95%;
+  --muted-foreground: 220 10% 45%;
+  
+  --accent: 30 90% 55%;
+  --accent-foreground: 0 0% 100%;
+  
+  --destructive: 0 85% 55%;
+  --destructive-foreground: 0 0% 100%;
+  
+  --sidebar: 60 5% 96%;
+  --sidebar-foreground: 220 15% 25%;
+  --sidebar-border: 220 15% 90%;
+  --sidebar-primary: 215 100% 45%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 15% 90%;
+  --sidebar-accent-foreground: 220 15% 20%;
+  --sidebar-ring: 215 100% 50%;
+
+  --app-font-sans: 'Outfit', sans-serif;
+  --app-font-mono: 'Space Mono', monospace;
+  --radius: 0rem; 
+}
+
+.dark {
+  --background: 220 15% 12%;
+  --foreground: 220 10% 90%;
+  --border: 220 15% 20%;
+  --input: 220 15% 20%;
+  --ring: 215 100% 60%;
+  
+  --card: 220 15% 15%;
+  --card-foreground: 220 10% 90%;
+  --card-border: 220 15% 22%;
+  
+  --popover: 220 15% 15%;
+  --popover-foreground: 220 10% 90%;
+  --popover-border: 220 15% 22%;
+  
+  --primary: 215 100% 60%;
+  --primary-foreground: 220 15% 10%;
+  
+  --secondary: 220 15% 22%;
+  --secondary-foreground: 220 10% 85%;
+  
+  --muted: 220 15% 18%;
+  --muted-foreground: 220 10% 60%;
+  
+  --accent: 30 90% 60%;
+  --accent-foreground: 220 15% 10%;
+  
+  --destructive: 0 80% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --sidebar: 220 15% 10%;
+  --sidebar-foreground: 220 10% 85%;
+  --sidebar-border: 220 15% 18%;
+  --sidebar-primary: 215 100% 60%;
+  --sidebar-primary-foreground: 220 15% 10%;
+  --sidebar-accent: 220 15% 18%;
+  --sidebar-accent-foreground: 220 10% 90%;
+  --sidebar-ring: 215 100% 60%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+  
+  /* Grid pattern for the blueprint feel */
+  .bg-blueprint {
+    background-image: linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
+                      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+}
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  header, .print-hide {
+    display: none !important;
+  }
+  .print-show {
+    display: block !important;
+  }
+  .print-w-full {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .results-pane {
+    height: auto !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .print-report {
+    display: block !important;
+  }
+  .print-report, .print-report > div, .print-report [data-radix-scroll-area-viewport] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+.print-report {
+  display: none;
+}

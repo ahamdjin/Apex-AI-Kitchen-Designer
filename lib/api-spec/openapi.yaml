@@ -1,22 +1,19 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Apex kitchen designer API
 servers:
   - url: /api
-    description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: catalog
+  - name: design
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +21,263 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /products:
+    get:
+      operationId: listProducts
+      tags: [catalog]
+      summary: List available product records including demo status
+      responses:
+        "200":
+          description: Product records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+  /products/{id}:
+    patch:
+      operationId: updateProduct
+      tags: [catalog]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
+      tags: [catalog]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+  /products/import:
+    post:
+      operationId: importProducts
+      tags: [catalog]
+      summary: Import an Excel-exported CSV, upserting by SKU
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogImportInput"
+      responses:
+        "200":
+          description: Import summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+  /catalog-summary:
+    get:
+      operationId: getCatalogSummary
+      tags: [catalog]
+      responses:
+        "200":
+          description: Catalog statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogSummary"
+  /designs/generate:
+    post:
+      operationId: generateDesign
+      tags: [design]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesignInput"
+      responses:
+        "200":
+          description: Constrained concept layout and matching catalog suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesignResult"
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
-        status:
-          type: string
-      required:
-        - status
-
+        status: { type: string }
+    DeleteResult:
+      type: object
+      required: [deleted]
+      properties:
+        deleted: { type: boolean }
+    ProductInput:
+      type: object
+      required: [sku, name, category, status]
+      properties:
+        sku: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        category: { type: string, enum: [base_cabinet, wall_cabinet, tall_cabinet, countertop, island, accessory] }
+        collection: { type: string }
+        finish: { type: string }
+        material: { type: string }
+        widthIn: { type: ["number", "null"] }
+        heightIn: { type: ["number", "null"] }
+        depthIn: { type: ["number", "null"] }
+        lengthIn: { type: ["number", "null"] }
+        price: { type: ["number", "null"] }
+        cost: { type: ["number", "null"] }
+        stockQty: { type: ["integer", "null"] }
+        unit: { type: string }
+        status: { type: string, enum: [demo, verified, inactive] }
+        notes: { type: string }
+        productUrl: { type: string }
+    Product:
+      allOf:
+        - $ref: "#/components/schemas/ProductInput"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: integer }
+    CatalogImportInput:
+      type: object
+      required: [csv]
+      properties:
+        csv: { type: string }
+    ImportResult:
+      type: object
+      required: [created, updated, errors]
+      properties:
+        created: { type: integer }
+        updated: { type: integer }
+        errors:
+          type: array
+          items: { type: string }
+    CatalogSummary:
+      type: object
+      required: [total, verified, demo, cabinets, countertops]
+      properties:
+        total: { type: integer }
+        verified: { type: integer }
+        demo: { type: integer }
+        cabinets: { type: integer }
+        countertops: { type: integer }
+    WindowInput:
+      type: object
+      required: [wall, offsetIn, widthIn, sillHeightIn, heightIn]
+      properties:
+        wall: { type: string }
+        offsetIn: { type: number }
+        widthIn: { type: number }
+        sillHeightIn: { type: number }
+        heightIn: { type: number }
+    OpeningInput:
+      type: object
+      required: [wall, offsetIn, widthIn]
+      properties:
+        wall: { type: string }
+        offsetIn: { type: number }
+        widthIn: { type: number }
+    FixtureInput:
+      type: object
+      required: [kind, wall, offsetIn, widthIn]
+      properties:
+        kind: { type: string, enum: [sink, range, fridge, dishwasher] }
+        wall: { type: string }
+        offsetIn: { type: number }
+        widthIn: { type: number }
+    IslandInput:
+      type: object
+      required: [mode, widthIn, lengthIn, fromLeftIn, fromBackIn]
+      properties:
+        mode: { type: string, enum: [none, existing, new] }
+        widthIn: { type: number }
+        lengthIn: { type: number }
+        fromLeftIn: { type: number }
+        fromBackIn: { type: number }
+    DesignInput:
+      type: object
+      required: [layout, walls, roomDepthIn, ceilingIn, windows, openings, fixtures, island, style, countertop]
+      properties:
+        layout: { type: string, enum: [l, u, galley, single, open] }
+        walls:
+          type: object
+          additionalProperties: { type: number }
+        roomDepthIn: { type: number }
+        ceilingIn: { type: number }
+        windows:
+          type: array
+          items: { $ref: "#/components/schemas/WindowInput" }
+        openings:
+          type: array
+          items: { $ref: "#/components/schemas/OpeningInput" }
+        fixtures:
+          type: array
+          items: { $ref: "#/components/schemas/FixtureInput" }
+        island: { $ref: "#/components/schemas/IslandInput" }
+        style: { type: string }
+        countertop: { type: string }
+    DesignModule:
+      type: object
+      required: [wall, offsetIn, widthIn, category, label]
+      properties:
+        wall: { type: string }
+        offsetIn: { type: number }
+        widthIn: { type: number }
+        category: { type: string }
+        label: { type: string }
+        productId: { type: ["integer", "null"] }
+    DesignResult:
+      type: object
+      required: [title, summary, modules, products, warnings, approximateTotal, verified]
+      properties:
+        title: { type: string }
+        summary: { type: string }
+        modules:
+          type: array
+          items: { $ref: "#/components/schemas/DesignModule" }
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        warnings:
+          type: array
+          items: { type: string }
+        approximateTotal: { type: ["number", "null"] }
+        verified: { type: boolean }
