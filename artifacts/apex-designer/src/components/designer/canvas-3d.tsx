@@ -39,6 +39,10 @@ export function Canvas3D({ design, result }: Props) {
   const cLen = (design.walls.C || 0) * SCALE;
   const ceiling = (design.ceilingIn || 96) * SCALE;
   const roomDepth = (design.roomDepthIn || 120) * SCALE;
+  const fitsWall = (item: { wall: string; offsetIn: number; widthIn: number }) =>
+    Number.isFinite(item.offsetIn) && Number.isFinite(item.widthIn) &&
+    item.offsetIn >= 0 && item.widthIn > 0 &&
+    item.offsetIn + item.widthIn <= (design.walls[item.wall] ?? 0);
 
   return (
     <div className="w-full h-full flex items-center justify-center relative overflow-hidden" style={{ perspective: '1200px' }}>
@@ -71,7 +75,7 @@ export function Canvas3D({ design, result }: Props) {
         )}
 
         {/* Windows */}
-        {design.windows.map((w, i) => {
+        {design.windows.filter(fitsWall).map((w, i) => {
           let wx=0, wy=0, ww=0, wd=0;
           if (w.wall === 'A') { wx = -1; wy = w.offsetIn * SCALE; ww = th + 2; wd = w.widthIn * SCALE; }
           if (w.wall === 'B') { wy = -1; wx = w.offsetIn * SCALE; wd = th + 2; ww = w.widthIn * SCALE; }
@@ -80,7 +84,7 @@ export function Canvas3D({ design, result }: Props) {
         })}
 
         {/* Openings */}
-        {design.openings.map((o, i) => {
+        {design.openings.filter(fitsWall).map((o, i) => {
           let wx=0, wy=0, ww=0, wd=0;
           if (o.wall === 'A') { wx = -1; wy = o.offsetIn * SCALE; ww = th + 2; wd = o.widthIn * SCALE; }
           if (o.wall === 'B') { wy = -1; wx = o.offsetIn * SCALE; wd = th + 2; ww = o.widthIn * SCALE; }
@@ -89,7 +93,7 @@ export function Canvas3D({ design, result }: Props) {
         })}
 
         {/* Cabinets / Fixtures */}
-        {(result ? result.modules : (design.fixtures as any[])).map((m: any, i: number) => {
+        {(result ? result.modules : design.fixtures).filter(fitsWall).map((m: any, i: number) => {
           const depth = 24 * SCALE;
           const width = m.widthIn * SCALE;
           const height = 34.5 * SCALE;

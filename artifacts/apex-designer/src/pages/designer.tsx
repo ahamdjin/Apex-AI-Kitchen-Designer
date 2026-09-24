@@ -7,25 +7,30 @@ import { DesignerResults } from "@/components/designer/results";
 import { useGenerateDesign } from "@workspace/api-client-react";
 import type { DesignResult } from "@workspace/api-client-react";
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Designer() {
   const [design, setDesign] = useDesignState();
   const [result, setResult] = useState<DesignResult | null>(null);
   const [viewTab, setViewTab] = useState("2d");
+  const [generationError, setGenerationError] = useState<string | null>(null);
   
   const generateDesign = useGenerateDesign();
 
   const handleGenerate = () => {
+    setGenerationError(null);
     generateDesign.mutate(
       { data: design },
       {
         onSuccess: (data) => {
           setResult(data);
+          setViewTab("3d");
           toast.success("Design generated successfully!");
         },
         onError: (err: any) => {
-          toast.error(err?.response?.data?.message || err.message || "Failed to generate design");
+          const message = err?.message || "Could not generate a design. Check the measurements and try again.";
+          setGenerationError(message);
+          toast.error(message);
           console.error(err);
         }
       }
@@ -43,6 +48,7 @@ export default function Designer() {
             onChange={setDesign} 
             onGenerate={handleGenerate}
             isGenerating={generateDesign.isPending}
+            generationError={generationError}
           />
         ) : (
           <DesignerResults 

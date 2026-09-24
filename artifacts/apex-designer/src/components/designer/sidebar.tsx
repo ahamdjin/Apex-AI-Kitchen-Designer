@@ -18,9 +18,10 @@ interface Props {
   onChange: (design: DesignInput) => void;
   onGenerate: () => void;
   isGenerating: boolean;
+  generationError: string | null;
 }
 
-export function DesignerSidebar({ design, onChange, onGenerate, isGenerating }: Props) {
+export function DesignerSidebar({ design, onChange, onGenerate, isGenerating, generationError }: Props) {
   
   const updateDesign = (updates: Partial<DesignInput>) => {
     onChange({ ...design, ...updates });
@@ -394,6 +395,11 @@ export function DesignerSidebar({ design, onChange, onGenerate, isGenerating }: 
       </ScrollArea>
 
       <div className="p-4 border-t bg-card">
+        {generationError && (
+          <div role="alert" className="mb-3 rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {generationError}
+          </div>
+        )}
         <Button 
           className="w-full font-bold shadow-md hover:shadow-lg transition-shadow" 
           onClick={onGenerate}

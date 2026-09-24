@@ -139,11 +139,14 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
       </g>
     );
   };
-  const drawElementOnWall = (wall: string, offset: number, width: number, type: 'window' | 'opening' | 'fixture' | 'cabinet', label: string) => {
+  const drawElementOnWall = (wall: string, offset: number, width: number, type: 'window' | 'opening' | 'fixture' | 'cabinet', label: string, itemKey: string) => {
     const seg = getWallSegment(wall);
     if (!seg) return null;
 
     const length = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1);
+    if (!Number.isFinite(length) || length <= 0 || !Number.isFinite(offset) ||
+        !Number.isFinite(width) || width <= 0 || offset < 0 ||
+        (offset + width) * SCALE > length) return null;
     const startRatio = (offset * SCALE) / length;
     const widthScaled = width * SCALE;
     
@@ -195,7 +198,7 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
 
     // Make it look 3D by adding a shadow/depth polygon
     return (
-      <g key={`${type}-${wall}-${offset}-${width}`} transform={`translate(${cx}, ${cy}) rotate(${angle})`}>
+      <g key={itemKey} transform={`translate(${cx}, ${cy}) rotate(${angle})`}>
         {/* Depth shadow */}
         {(type === 'cabinet' || type === 'fixture') && (
           <polygon 
@@ -323,17 +326,17 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
         {getWallsForLayout(design.layout).map(drawWallSegment)}
 
         {/* Base user inputs (Windows, Openings) */}
-        {design.windows.map(w => drawElementOnWall(w.wall, w.offsetIn, w.widthIn, 'window', 'WIN'))}
-        {design.openings.map(o => drawElementOnWall(o.wall, o.offsetIn, o.widthIn, 'opening', 'OPEN'))}
+        {design.windows.map((w, i) => drawElementOnWall(w.wall, w.offsetIn, w.widthIn, 'window', 'WIN', `window-${i}`))}
+        {design.openings.map((o, i) => drawElementOnWall(o.wall, o.offsetIn, o.widthIn, 'opening', 'OPEN', `opening-${i}`))}
 
         {/* If we have a result, show generated modules. Otherwise show rough fixture placement */}
         {result ? (
           <>
-            {result.modules.map((m, i) => drawElementOnWall(m.wall, m.offsetIn, m.widthIn, 'cabinet', m.label || 'CAB'))}
+            {result.modules.map((m, i) => drawElementOnWall(m.wall, m.offsetIn, m.widthIn, m.category === 'fixture' ? 'fixture' : 'cabinet', m.label || 'CAB', `module-${i}`))}
           </>
         ) : (
           <>
-            {design.fixtures.map(f => drawElementOnWall(f.wall, f.offsetIn, f.widthIn, 'fixture', f.kind.toUpperCase()))}
+            {design.fixtures.map((f, i) => drawElementOnWall(f.wall, f.offsetIn, f.widthIn, 'fixture', f.kind.toUpperCase(), `fixture-${i}`))}
           </>
         )}
 
