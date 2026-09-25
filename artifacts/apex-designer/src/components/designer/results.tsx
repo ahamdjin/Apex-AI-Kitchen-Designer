@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/utils";
 import type { DesignResult } from "@workspace/api-client-react";
 import { AlertTriangle, CheckCircle2, ChevronLeft, Download, Info } from "lucide-react";
@@ -21,7 +20,7 @@ interface Props {
 export function DesignerResults({ result, onEdit }: Props) {
   
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col h-auto md:h-full bg-card">
       <div className="p-4 border-b bg-muted/20 flex items-center justify-between sticky top-0 z-10">
         <div>
           <Button variant="ghost" size="sm" onClick={onEdit} className="-ml-2 mb-2 text-muted-foreground h-7">
@@ -32,7 +31,7 @@ export function DesignerResults({ result, onEdit }: Props) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 md:min-h-0 md:overflow-y-auto">
         <div className="p-6 space-y-8">
           
           {/* Status & Summary */}
@@ -113,7 +112,7 @@ export function DesignerResults({ result, onEdit }: Props) {
           </div>
 
         </div>
-      </ScrollArea>
+      </div>
       
       <div className="p-4 border-t bg-card print-hide">
         <Button className="w-full" variant="outline" onClick={() => window.print()}>

@@ -47,7 +47,7 @@ export function Canvas3D({ design, result }: Props) {
   return (
     <div className="w-full h-full flex items-center justify-center relative overflow-hidden" style={{ perspective: '1200px' }}>
       <div 
-        className="relative transition-transform duration-700 ease-out" 
+        className="isometric-scene relative transition-transform duration-700 ease-out" 
         style={{ 
           width: bLen + 100, 
           height: Math.max(aLen, cLen, roomDepth) + 100, 

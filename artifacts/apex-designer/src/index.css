@@ -186,3 +186,8 @@
 .print-report {
   display: none;
 }
+@media (max-width: 767px) {
+  .isometric-scene {
+    scale: 0.72;
+  }
+}
