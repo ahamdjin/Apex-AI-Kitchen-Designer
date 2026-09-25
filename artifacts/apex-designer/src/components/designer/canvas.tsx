@@ -91,6 +91,9 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
       if (wall === 'A') return { x1: ox, y1: oy, x2: ox, y2: oy + aLen, angle: 90 };
       if (wall === 'B') return { x1: ox + 60*SCALE, y1: oy, x2: ox + 60*SCALE, y2: oy + bLen, angle: 90 };
     }
+    if (design.layout === 'open') {
+      if (wall === 'A') return { x1: ox, y1: oy, x2: ox + aLen, y2: oy, angle: 0 };
+    }
     return null;
   };
 
