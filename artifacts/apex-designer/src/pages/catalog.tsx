@@ -10,10 +10,10 @@ import {
   getGetCatalogSummaryQueryKey,
   Product
 } from "@workspace/api-client-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Download, Upload, Search, Trash2, Edit } from "lucide-react";
+import { Plus, Upload, Search, Trash2, Edit, LockKeyhole, LogOut } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -26,22 +26,97 @@ import { Badge } from "@/components/ui/badge";
 import { ProductForm } from "@/components/catalog/product-form";
 import { ImportDialog } from "@/components/catalog/import-dialog";
 import { formatCurrency } from "@/lib/utils";
+import { clearAdminToken, getAdminToken, saveAdminToken } from "@/lib/admin-auth";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-
-  const { data: products = [], isLoading } = useListProducts();
-  const { data: summary } = useGetCatalogSummary();
-  const deleteProduct = useDeleteProduct();
+  const [adminToken, setAdminToken] = useState(() => getAdminToken() ?? "");
+  const [tokenDraft, setTokenDraft] = useState("");
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const hasAdminToken = adminToken.length > 0;
+
+  const {
+    data: products = [],
+    isLoading,
+    error: productsError,
+  } = useListProducts({ query: { enabled: hasAdminToken, retry: false } });
+  const {
+    data: summary,
+    error: summaryError,
+  } = useGetCatalogSummary({ query: { enabled: hasAdminToken, retry: false } });
+  const deleteProduct = useDeleteProduct();
+
+  const authStatus = (productsError as { status?: number } | null)?.status
+    ?? (summaryError as { status?: number } | null)?.status;
+
+  useEffect(() => {
+    if (authStatus === 401) {
+      clearAdminToken();
+      setAdminToken("");
+      setAuthMessage("That admin key was not accepted.");
+    } else if (authStatus === 503) {
+      setAuthMessage("Catalog administration is not configured on the server.");
+    }
+  }, [authStatus]);
+
+  const unlockCatalog = (event: React.FormEvent) => {
+    event.preventDefault();
+    const token = tokenDraft.trim();
+    if (!token) {
+      setAuthMessage("Enter the admin key.");
+      return;
+    }
+    queryClient.removeQueries({ queryKey: getListProductsQueryKey() });
+    queryClient.removeQueries({ queryKey: getGetCatalogSummaryQueryKey() });
+    saveAdminToken(token);
+    setAdminToken(token);
+    setTokenDraft("");
+    setAuthMessage(null);
+  };
+
+  const logout = () => {
+    clearAdminToken();
+    setAdminToken("");
+    queryClient.removeQueries({ queryKey: getListProductsQueryKey() });
+    queryClient.removeQueries({ queryKey: getGetCatalogSummaryQueryKey() });
+  };
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || 
     p.sku.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (!hasAdminToken) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center p-6">
+        <form onSubmit={unlockCatalog} className="w-full max-w-md space-y-5 border bg-card p-6 shadow-sm">
+          <div>
+            <div className="mb-3 flex size-10 items-center justify-center border bg-muted">
+              <LockKeyhole className="size-5" />
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight">Catalog Admin</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enter the server-side admin key. It is kept only in this browser tab.
+            </p>
+          </div>
+          <Input
+            type="password"
+            autoComplete="off"
+            value={tokenDraft}
+            onChange={(event) => setTokenDraft(event.target.value)}
+            placeholder="Admin key"
+            aria-label="Admin key"
+          />
+          {authMessage && <p role="alert" className="text-sm text-destructive">{authMessage}</p>}
+          <Button type="submit" className="w-full">Unlock catalog</Button>
+        </form>
+      </div>
+    );
+  }
 
   const handleDelete = (id: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
@@ -63,6 +138,10 @@ export default function Catalog() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="ghost" onClick={logout} title="Lock catalog">
+            <LogOut className="w-4 h-4 mr-2" />
+            Lock
+          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Import CSV
