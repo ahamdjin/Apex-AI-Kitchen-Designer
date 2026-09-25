@@ -43,11 +43,11 @@ export default function Catalog() {
     data: products = [],
     isLoading,
     error: productsError,
-  } = useListProducts({ query: { enabled: hasAdminToken, retry: false } });
+  } = useListProducts({ query: { queryKey: getListProductsQueryKey(), enabled: hasAdminToken, retry: false } });
   const {
     data: summary,
     error: summaryError,
-  } = useGetCatalogSummary({ query: { enabled: hasAdminToken, retry: false } });
+  } = useGetCatalogSummary({ query: { queryKey: getGetCatalogSummaryQueryKey(), enabled: hasAdminToken, retry: false } });
   const deleteProduct = useDeleteProduct();
 
   const authStatus = (productsError as { status?: number } | null)?.status
