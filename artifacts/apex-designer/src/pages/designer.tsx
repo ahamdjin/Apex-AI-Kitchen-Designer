@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useDesignState } from "@/lib/design-state";
+import { normalizeDesignInput, useDesignState } from "@/lib/design-state";
 import { DesignerSidebar } from "@/components/designer/sidebar";
 import { DesignerCanvas } from "@/components/designer/canvas";
 import { DesignerResults } from "@/components/designer/results";
@@ -60,7 +60,7 @@ export default function Designer() {
   const handleGenerate = () => {
     if (generationLocked.current) return;
     generationLocked.current = true;
-    const input = structuredClone(design);
+    const input = normalizeDesignInput(structuredClone(design));
     const epoch = ++generationEpoch.current;
     generatedInputRef.current = null;
     setGenerationError(null);
@@ -152,10 +152,7 @@ export default function Designer() {
             {presentation}
           </div>
         ) : (
-          <div className="order-2 flex-1 min-w-0 relative bg-blueprint h-[520px] md:h-full">
-            <div className="absolute top-4 right-4 z-10 bg-card/90 backdrop-blur border px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              Measured plan / live preview
-            </div>
+          <div className="order-2 flex-1 min-w-0 relative bg-blueprint h-[62dvh] min-h-[430px] max-h-[720px] md:h-full md:max-h-none">
             <DesignerCanvas design={design} result={null} onChange={setDesign} />
           </div>
         )}

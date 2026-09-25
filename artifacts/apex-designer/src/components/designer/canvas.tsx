@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { DesignInput, DesignResult } from '@workspace/api-client-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, ZoomIn, ZoomOut, Scan } from 'lucide-react';
 import { getWallsForLayout } from '@/lib/design-state';
 
 interface Props {
@@ -13,233 +13,260 @@ interface Props {
   onChange?: (design: DesignInput) => void;
 }
 
+type PlanElementType = 'window' | 'opening' | 'fixture' | 'cabinet';
+
 export function DesignerCanvas({ design, result, onChange }: Props) {
-  
-  // One inch is four SVG units in the measured plan.
   const SCALE = 4;
-  
+  const MARGIN = 120;
   const [selectedWall, setSelectedWall] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const gridId = useId().replace(/:/g, '');
+  const titleId = useId().replace(/:/g, '');
 
-  // Canvas bounds based on max walls.
-  const maxWidth = Math.max(design.walls.A || 0, design.walls.C || 0, design.roomDepthIn || 200) * SCALE + 200;
-  const maxHeight = Math.max(design.walls.B || 0, design.roomDepthIn || 200) * SCALE + 200;
+  const aIn = Math.max(design.walls.A || 0, 1);
+  const bIn = Math.max(design.walls.B || 0, 1);
+  const cIn = Math.max(design.walls.C || 0, 1);
+  const roomDepthIn = Math.max(design.roomDepthIn || 0, 1);
+  const galleyGapIn = Math.max(60, Math.min(roomDepthIn, 180));
 
-  // Let's create a coordinate system where:
-  // Wall B is Top horizontal (if U-shape)
-  // Wall A is Left vertical
-  // Wall C is Right vertical
-  
+  const planWidthIn =
+    design.layout === 'u' || design.layout === 'l' ? bIn :
+    design.layout === 'galley' ? galleyGapIn :
+    design.layout === 'open' ? aIn :
+    Math.max(72, Math.min(roomDepthIn, 180));
+
+  const planHeightIn =
+    design.layout === 'u' ? Math.max(aIn, cIn) :
+    design.layout === 'l' ? aIn :
+    design.layout === 'galley' ? Math.max(aIn, bIn) :
+    design.layout === 'open' ? roomDepthIn :
+    aIn;
+
+  const contentWidth = planWidthIn * SCALE;
+  const contentHeight = planHeightIn * SCALE;
+  const fullWidth = contentWidth + MARGIN * 2;
+  const fullHeight = contentHeight + MARGIN * 2;
+  const uiScale = Math.max(1, Math.min(4.5, Math.max(contentWidth, contentHeight) / 700));
+
+  const zoomedWidth = fullWidth / zoom;
+  const zoomedHeight = fullHeight / zoom;
+  const viewX = (fullWidth - zoomedWidth) / 2;
+  const viewY = (fullHeight - zoomedHeight) / 2;
+
+  const ox = MARGIN;
+  const oy = MARGIN;
+
   const generateWallsPath = () => {
-    let d = "";
-    const wallThickness = 6 * SCALE;
-    
-    // Top-left origin
-    const ox = 100;
-    const oy = 100;
+    const aLen = aIn * SCALE;
+    const bLen = bIn * SCALE;
+    const cLen = cIn * SCALE;
+    const gap = galleyGapIn * SCALE;
 
-    // Draw lines representing the walls
     if (design.layout === 'single') {
-      const len = (design.walls.A || 100) * SCALE;
-      d = `M ${ox} ${oy} L ${ox} ${oy + len}`;
-    } else if (design.layout === 'l') {
-      const aLen = (design.walls.A || 100) * SCALE;
-      const bLen = (design.walls.B || 100) * SCALE;
-      // Wall A going down
-      // Wall B going right from top of A
-      d = `M ${ox} ${oy + aLen} L ${ox} ${oy} L ${ox + bLen} ${oy}`;
-    } else if (design.layout === 'u') {
-      const aLen = (design.walls.A || 100) * SCALE;
-      const bLen = (design.walls.B || 100) * SCALE;
-      const cLen = (design.walls.C || 100) * SCALE;
-      // Wall A going up, Wall B right, Wall C going down
-      d = `M ${ox} ${oy + aLen} L ${ox} ${oy} L ${ox + bLen} ${oy} L ${ox + bLen} ${oy + cLen}`;
-    } else if (design.layout === 'galley') {
-      const aLen = (design.walls.A || 100) * SCALE;
-      const bLen = (design.walls.B || 100) * SCALE;
-      const gap = 60 * SCALE;
-      d = `M ${ox} ${oy} L ${ox} ${oy + aLen} M ${ox + gap} ${oy} L ${ox + gap} ${oy + bLen}`;
-    } else if (design.layout === 'open') {
-      // Just a bounding box representing room
-      const w = (design.walls.A || 100) * SCALE;
-      const h = (design.roomDepthIn || 100) * SCALE;
-      d = `M ${ox} ${oy} L ${ox+w} ${oy} L ${ox+w} ${oy+h} L ${ox} ${oy+h} Z`;
-    }
-
-    return d;
-  };
-
-  // Helper to get line segment for a wall to map fixtures/windows on it
-  const getWallSegment = (wall: string) => {
-    const ox = 100, oy = 100;
-    const aLen = (design.walls.A || 0) * SCALE;
-    const bLen = (design.walls.B || 0) * SCALE;
-    const cLen = (design.walls.C || 0) * SCALE;
-
-    if (design.layout === 'u') {
-      if (wall === 'A') return { x1: ox, y1: oy + aLen, x2: ox, y2: oy, angle: 90 };
-      if (wall === 'B') return { x1: ox, y1: oy, x2: ox + bLen, y2: oy, angle: 0 };
-      if (wall === 'C') return { x1: ox + bLen, y1: oy, x2: ox + bLen, y2: oy + cLen, angle: 90 };
+      return 'M ' + ox + ' ' + oy + ' L ' + ox + ' ' + (oy + aLen);
     }
     if (design.layout === 'l') {
-      if (wall === 'A') return { x1: ox, y1: oy + aLen, x2: ox, y2: oy, angle: 90 };
-      if (wall === 'B') return { x1: ox, y1: oy, x2: ox + bLen, y2: oy, angle: 0 };
+      return 'M ' + ox + ' ' + (oy + aLen) + ' L ' + ox + ' ' + oy + ' L ' + (ox + bLen) + ' ' + oy;
     }
-    if (design.layout === 'single') {
-      if (wall === 'A') return { x1: ox, y1: oy, x2: ox, y2: oy + aLen, angle: 90 };
+    if (design.layout === 'u') {
+      return 'M ' + ox + ' ' + (oy + aLen) + ' L ' + ox + ' ' + oy + ' L ' + (ox + bLen) + ' ' + oy + ' L ' + (ox + bLen) + ' ' + (oy + cLen);
     }
     if (design.layout === 'galley') {
-      if (wall === 'A') return { x1: ox, y1: oy, x2: ox, y2: oy + aLen, angle: 90 };
-      if (wall === 'B') return { x1: ox + 60*SCALE, y1: oy, x2: ox + 60*SCALE, y2: oy + bLen, angle: 90 };
+      return 'M ' + ox + ' ' + oy + ' L ' + ox + ' ' + (oy + aLen) + ' M ' + (ox + gap) + ' ' + oy + ' L ' + (ox + gap) + ' ' + (oy + bLen);
+    }
+    if (design.layout === 'open') {
+      const width = aIn * SCALE;
+      const depth = roomDepthIn * SCALE;
+      return 'M ' + ox + ' ' + oy + ' L ' + (ox + width) + ' ' + oy + ' L ' + (ox + width) + ' ' + (oy + depth) + ' L ' + ox + ' ' + (oy + depth) + ' Z';
+    }
+    return '';
+  };
+
+  const getWallSegment = (wall: string) => {
+    const aLen = aIn * SCALE;
+    const bLen = bIn * SCALE;
+    const cLen = cIn * SCALE;
+    const gap = galleyGapIn * SCALE;
+
+    if (design.layout === 'u') {
+      if (wall === 'A') return { x1: ox, y1: oy + aLen, x2: ox, y2: oy };
+      if (wall === 'B') return { x1: ox, y1: oy, x2: ox + bLen, y2: oy };
+      if (wall === 'C') return { x1: ox + bLen, y1: oy, x2: ox + bLen, y2: oy + cLen };
+    }
+    if (design.layout === 'l') {
+      if (wall === 'A') return { x1: ox, y1: oy + aLen, x2: ox, y2: oy };
+      if (wall === 'B') return { x1: ox, y1: oy, x2: ox + bLen, y2: oy };
+    }
+    if (design.layout === 'single') {
+      if (wall === 'A') return { x1: ox, y1: oy, x2: ox, y2: oy + aLen };
+    }
+    if (design.layout === 'galley') {
+      if (wall === 'A') return { x1: ox, y1: oy, x2: ox, y2: oy + aLen };
+      if (wall === 'B') return { x1: ox + gap, y1: oy, x2: ox + gap, y2: oy + bLen };
+    }
+    if (design.layout === 'open') {
+      if (wall === 'A') return { x1: ox, y1: oy, x2: ox + aLen, y2: oy };
     }
     return null;
   };
 
+  const interiorSign = (wall: string) => {
+    if (design.layout === 'galley') return wall === 'A' ? -1 : 1;
+    if (design.layout === 'single') return -1;
+    return 1;
+  };
+
   const drawWallSegment = (wall: string) => {
-    const seg = getWallSegment(wall);
-    if (!seg) return null;
-    
+    const segment = getWallSegment(wall);
+    if (!segment) return null;
+
     const isSelected = selectedWall === wall;
-    const midX = (seg.x1 + seg.x2) / 2;
-    const midY = (seg.y1 + seg.y2) / 2;
-    const dx = seg.x2 - seg.x1;
-    const dy = seg.y2 - seg.y1;
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    
-    // Draw offset arrow indicator at the start corner
-    const arrowX = seg.x1 + (dx === 0 ? 0 : Math.sign(dx) * 20);
-    const arrowY = seg.y1 + (dy === 0 ? 0 : Math.sign(dy) * 20);
+    const midX = (segment.x1 + segment.x2) / 2;
+    const midY = (segment.y1 + segment.y2) / 2;
+    const dx = segment.x2 - segment.x1;
+    const dy = segment.y2 - segment.y1;
 
     return (
-      <g key={`wall-group-${wall}`}>
-        {/* Invisible thick line for click target */}
-        <line 
-          x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2} 
-          stroke="transparent" 
-          strokeWidth={40} 
-          className="cursor-pointer"
-          onClick={() => setSelectedWall(wall)}
+      <g key={'wall-group-' + wall}>
+        <line
+          x1={segment.x1}
+          y1={segment.y1}
+          x2={segment.x2}
+          y2={segment.y2}
+          stroke="transparent"
+          strokeWidth={Math.max(36, 24 * uiScale)}
+          className={onChange ? 'cursor-pointer' : 'cursor-default'}
+          onClick={() => onChange && setSelectedWall(wall)}
         />
-        {isSelected && (
-          <line 
-            x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2} 
-            stroke="hsl(var(--primary))" 
-            strokeWidth={12} 
-            className="pointer-events-none opacity-50 transition-opacity"
+        {isSelected && onChange && (
+          <line
+            x1={segment.x1}
+            y1={segment.y1}
+            x2={segment.x2}
+            y2={segment.y2}
+            stroke="hsl(var(--primary))"
+            strokeWidth={10}
+            opacity={0.28}
             strokeLinecap="square"
+            vectorEffect="non-scaling-stroke"
+            className="pointer-events-none"
           />
         )}
-        
-        {/* Origin arrow */}
-        <circle cx={seg.x1} cy={seg.y1} r={6} fill="hsl(var(--destructive))" className="pointer-events-none" />
-        <text x={seg.x1 + (dx===0?15:-15)} y={seg.y1 + (dy===0?-15:15)} fontSize="10" fill="hsl(var(--destructive))" className="font-bold pointer-events-none">0"</text>
-        <text x={midX + (dx === 0 ? 18 : 0)} y={midY + (dy === 0 ? -18 : 0)} textAnchor="middle" fontSize="13" fill="currentColor" className="font-mono font-semibold pointer-events-none">
-          {`Wall ${wall} · ${design.walls[wall] || 0}"`}
+
+        {onChange && (
+          <>
+            <circle
+              cx={segment.x1}
+              cy={segment.y1}
+              r={4 * uiScale}
+              fill="hsl(var(--destructive))"
+              className="pointer-events-none"
+            />
+            <text
+              x={segment.x1 + (dx === 0 ? 14 * uiScale : -10 * uiScale)}
+              y={segment.y1 + (dy === 0 ? -12 * uiScale : 12 * uiScale)}
+              fontSize={10 * uiScale}
+              fill="hsl(var(--destructive))"
+              className="font-bold pointer-events-none"
+            >
+              0"
+            </text>
+          </>
+        )}
+
+        <text
+          x={midX + (dx === 0 ? 18 * uiScale : 0)}
+          y={midY + (dy === 0 ? -16 * uiScale : 0)}
+          textAnchor="middle"
+          fontSize={12 * uiScale}
+          fill="currentColor"
+          className="font-mono font-semibold pointer-events-none"
+        >
+          {'Wall ' + wall + ' · ' + (design.walls[wall] || 0) + '"'}
         </text>
       </g>
     );
   };
-  const drawElementOnWall = (wall: string, offset: number, width: number, type: 'window' | 'opening' | 'fixture' | 'cabinet', label: string, itemKey: string, showUpper = false) => {
-    const seg = getWallSegment(wall);
-    if (!seg) return null;
 
-    const length = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1);
+  const drawElementOnWall = (
+    wall: string,
+    offset: number,
+    width: number,
+    type: PlanElementType,
+    label: string,
+    itemKey: string,
+  ) => {
+    const segment = getWallSegment(wall);
+    if (!segment) return null;
+
+    const length = Math.hypot(segment.x2 - segment.x1, segment.y2 - segment.y1);
     if (!Number.isFinite(length) || length <= 0 || !Number.isFinite(offset) ||
-        !Number.isFinite(width) || width <= 0 || offset < 0 ||
-        (offset + width) * SCALE > length) return null;
-    const startRatio = (offset * SCALE) / length;
-    const widthScaled = width * SCALE;
-    
-    // Simplistic interpolation
-    const startX = seg.x1 + (seg.x2 - seg.x1) * startRatio;
-    const startY = seg.y1 + (seg.y2 - seg.y1) * startRatio;
-    
-    const depth = type === 'cabinet' ? 24 * SCALE : type === 'fixture' ? 26 * SCALE : 8 * SCALE;
-    
-    // Normal vector
-    const dx = seg.x2 - seg.x1;
-    const dy = seg.y2 - seg.y1;
-    const l = Math.hypot(dx, dy);
-    const nx = -dy / l; // normal x
-    const ny = dx / l;  // normal y
-    
-    // Shift cabinets inwards. Wait, the normal points left/up depending on orientation.
-    // For U shape: A (up), nx=1 (right). B (right), nx=0, ny=1 (down). C (down), nx=-1 (left).
-    const isInterior = (wall === 'A' || wall === 'B' || wall === 'C' && seg.y2 > seg.y1) ? 1 : -1;
-    
-    const cx = startX + (dx/l) * (widthScaled / 2) + nx * (depth / 2) * isInterior;
-    const cy = startY + (dy/l) * (widthScaled / 2) + ny * (depth / 2) * isInterior;
-
-    let fill = "transparent";
-    let stroke = "hsl(var(--primary))";
-    let strokeWidth = 2;
-    let depthColor = "hsl(var(--primary) / 0.5)";
-    
-    if (type === 'window') {
-      stroke = "#60a5fa"; // blue-400
-      fill = "rgba(96, 165, 250, 0.2)";
-      depthColor = "#93c5fd";
-    } else if (type === 'opening') {
-      stroke = "#f97316";
-      fill = "rgba(249, 115, 22, 0.2)";
-      depthColor = "#fdba74";
-    } else if (type === 'fixture') {
-      stroke = "#a855f7"; // purple-500
-      fill = "rgba(168, 85, 247, 0.2)";
-      depthColor = "#d8b4fe";
-    } else if (type === 'cabinet') {
-      stroke = "hsl(var(--primary))";
-      fill = "hsl(var(--card))";
+      !Number.isFinite(width) || width <= 0 || offset < 0 ||
+      (offset + width) * SCALE > length) {
+      return null;
     }
 
-    // Box rotation
+    const startRatio = (offset * SCALE) / length;
+    const widthScaled = width * SCALE;
+    const startX = segment.x1 + (segment.x2 - segment.x1) * startRatio;
+    const startY = segment.y1 + (segment.y2 - segment.y1) * startRatio;
+    const depth = (type === 'cabinet' ? 24 : type === 'fixture' ? 26 : 8) * SCALE;
+
+    const dx = segment.x2 - segment.x1;
+    const dy = segment.y2 - segment.y1;
+    const segmentLength = Math.hypot(dx, dy);
+    const nx = -dy / segmentLength;
+    const ny = dx / segmentLength;
+    const sign = interiorSign(wall);
+
+    const cx = startX + (dx / segmentLength) * (widthScaled / 2) + nx * (depth / 2) * sign;
+    const cy = startY + (dy / segmentLength) * (widthScaled / 2) + ny * (depth / 2) * sign;
     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-    // Make it look 3D by adding a shadow/depth polygon
+    let fill = 'transparent';
+    let stroke = 'hsl(var(--primary))';
+
+    if (type === 'window') {
+      stroke = '#60a5fa';
+      fill = 'rgba(96, 165, 250, 0.18)';
+    } else if (type === 'opening') {
+      stroke = '#f97316';
+      fill = 'rgba(249, 115, 22, 0.15)';
+    } else if (type === 'fixture') {
+      stroke = '#a855f7';
+      fill = 'rgba(168, 85, 247, 0.16)';
+    } else if (type === 'cabinet') {
+      fill = 'hsl(var(--card))';
+    }
+
+    const compactLabel = label.length > 14 ? label.slice(0, 13) + '…' : label;
+    const textSize = Math.max(8, Math.min(12, width / 3.2)) * uiScale;
+
     return (
-      <g key={itemKey} transform={`translate(${cx}, ${cy}) rotate(${angle})`}>
-        {/* Fixtures retain their visual distinction; cabinet symbols stay flat. */}
-        {type === 'fixture' && (
-          <polygon 
-            points={`${-widthScaled/2},${depth/2} ${widthScaled/2},${depth/2} ${widthScaled/2 + 4},${depth/2 + 4} ${-widthScaled/2 + 4},${depth/2 + 4}`}
-            fill={depthColor}
-          />
-        )}
-        <rect 
-          x={-widthScaled / 2} 
-          y={-depth / 2} 
-          width={widthScaled} 
-          height={depth} 
-          fill={fill} 
-          stroke={stroke} 
-          strokeWidth={strokeWidth}
+      <g key={itemKey} transform={'translate(' + cx + ', ' + cy + ') rotate(' + angle + ')'}>
+        <rect
+          x={-widthScaled / 2}
+          y={-depth / 2}
+          width={widthScaled}
+          height={depth}
+          rx={type === 'cabinet' ? 2 * uiScale : 1 * uiScale}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={type === 'cabinet' ? 2.2 : 2}
+          vectorEffect="non-scaling-stroke"
           className="transition-all duration-300"
         />
-        {type === 'cabinet' && showUpper && widthScaled > 16 && (
-          <rect
-            x={-widthScaled / 2 + 6}
-            y={-depth / 2 + 6}
-            width={widthScaled - 12}
-            height={depth / 2 - 12}
-            fill="none"
-            stroke="hsl(var(--primary))"
-            strokeWidth={2}
-            strokeDasharray="7 5"
-            pointerEvents="none"
-            aria-label="Upper cabinet, shown dashed within base cabinet footprint"
-          />
-        )}
-        {(type === 'fixture' || type === 'cabinet') && (
-          <text 
-            x={0} 
-            y={0} 
-            textAnchor="middle" 
-            dominantBaseline="middle" 
-            fontSize={type === 'cabinet' ? 8 : 10}
+        {(type === 'fixture' || type === 'cabinet') && width >= 9 && (
+          <text
+            x={0}
+            y={0}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={textSize}
             fill="currentColor"
-            transform={angle > 90 || angle < -90 ? "rotate(180)" : ""}
-            className="font-mono font-semibold opacity-70 pointer-events-none"
+            className="font-mono font-semibold opacity-75 pointer-events-none"
           >
-            {label}
+            {compactLabel}
           </text>
         )}
       </g>
@@ -248,192 +275,152 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
 
   const drawIsland = () => {
     if (design.island.mode === 'none') return null;
-    
-    // Just place it somewhere in the middle
-    // fromLeftIn and fromBackIn
-    const ox = 100;
-    const oy = 100;
-    
-    const x = ox + (design.island.fromLeftIn * SCALE);
-    const y = oy + (design.island.fromBackIn * SCALE);
-    const w = design.island.widthIn * SCALE;
-    const h = design.island.lengthIn * SCALE;
-    
+
+    const x = ox + design.island.fromLeftIn * SCALE;
+    const y = oy + design.island.fromBackIn * SCALE;
+    const width = design.island.widthIn * SCALE;
+    const length = design.island.lengthIn * SCALE;
+
     return (
-      <g transform={`translate(${x + w/2}, ${y + h/2})`}>
-        <polygon 
-          points={`${-w/2},${h/2} ${w/2},${h/2} ${w/2 + 6},${h/2 + 6} ${-w/2 + 6},${h/2 + 6}`}
-          fill="hsl(var(--muted-foreground) / 0.2)"
-        />
+      <g transform={'translate(' + (x + width / 2) + ', ' + (y + length / 2) + ')'}>
         <rect
-          x={-w/2}
-          y={-h/2}
-          width={w}
-          height={h}
+          x={-width / 2}
+          y={-length / 2}
+          width={width}
+          height={length}
+          rx={3 * uiScale}
           fill="hsl(var(--card))"
           stroke="hsl(var(--primary))"
-          strokeWidth="2"
-          strokeDasharray={design.island.mode === 'new' ? '4 4' : 'none'}
+          strokeWidth={2.5}
+          strokeDasharray={design.island.mode === 'new' ? '8 6' : undefined}
+          vectorEffect="non-scaling-stroke"
         />
-        <text 
-          textAnchor="middle" 
-          dominantBaseline="middle" 
-          fontSize="10"
+        <text
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={11 * uiScale}
           fill="currentColor"
-          className="font-mono font-semibold opacity-70 pointer-events-none"
+          className="font-mono font-semibold pointer-events-none"
         >
-          ISLAND
+          {'ISLAND · ' + design.island.widthIn + '" × ' + design.island.lengthIn + '"'}
         </text>
       </g>
     );
-  }
+  };
+
+  const layoutLabel = {
+    u: 'U-shaped',
+    l: 'L-shaped',
+    galley: 'Galley',
+    single: 'Single wall',
+    open: 'Open / island',
+  }[design.layout];
 
   return (
-    <div className="w-full h-full flex items-center justify-center relative">
-      
-      {/* Legend */}
-      <div className="absolute top-4 left-4 bg-card/90 backdrop-blur border p-3 rounded-lg shadow-sm text-xs font-mono space-y-2 pointer-events-none z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-primary bg-card"></div>
-          <span>Base cabinet</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-dashed border-primary bg-card"></div>
-          <span>Upper cabinet (concept)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-purple-500 bg-purple-500/20"></div>
-          <span>Fixture</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-blue-400 bg-blue-400/20"></div>
-          <span>Window</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-orange-500 bg-orange-500/20"></div>
-          <span>Opening</span>
+    <div className={`relative flex h-full min-h-0 w-full flex-col overflow-hidden select-none ${result ? 'bg-muted/60 p-2 sm:p-3' : ''}`}>
+      <div className={`relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden ${result ? 'border-2 border-b-0 border-foreground bg-card' : ''}`}>
+      <div className="absolute left-3 top-3 z-10 hidden max-w-[220px] rounded-md border bg-card/92 p-3 text-[11px] shadow-sm backdrop-blur sm:block">
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Measured plan</p>
+        <p className="mt-1 font-medium">{layoutLabel}</p>
+        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1.5"><i className="size-2 border-2 border-primary bg-card" />Cabinet</span>
+          <span className="flex items-center gap-1.5"><i className="size-2 border-2 border-purple-500 bg-purple-500/20" />Fixture</span>
+          <span className="flex items-center gap-1.5"><i className="size-2 border-2 border-blue-400 bg-blue-400/20" />Window</span>
+          <span className="flex items-center gap-1.5"><i className="size-2 border-2 border-orange-500 bg-orange-500/20" />Opening</span>
         </div>
       </div>
 
-      <svg 
-        width="100%" 
-        height="100%" 
-        viewBox={`0 0 ${maxWidth} ${maxHeight}`}
-        preserveAspectRatio="xMidYMid meet"
-        className="max-w-full max-h-full drop-shadow-md"
-      >
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border bg-card/92 p-1 shadow-sm backdrop-blur">
+        <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => setZoom(value => Math.max(1, Number((value - 0.25).toFixed(2))))} disabled={zoom <= 1} aria-label="Zoom out plan">
+          <ZoomOut className="size-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => setZoom(1)} aria-label="Fit plan">
+          <Scan className="size-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => setZoom(value => Math.min(2.5, Number((value + 0.25).toFixed(2))))} disabled={zoom >= 2.5} aria-label="Zoom in plan">
+          <ZoomIn className="size-4" />
+        </Button>
+      </div>
+
+      <svg width="100%" height="100%" viewBox={[viewX, viewY, zoomedWidth, zoomedHeight].join(' ')} preserveAspectRatio="xMidYMid meet" className="h-full w-full max-w-full" role="img" aria-labelledby={titleId}>
+        <title id={titleId}>{layoutLabel + ' measured kitchen plan'}</title>
         <defs>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="hsl(var(--border))" strokeWidth="1" strokeOpacity="0.5"/>
+          <pattern id={gridId} width={10 * SCALE} height={10 * SCALE} patternUnits="userSpaceOnUse">
+            <path d={'M ' + (10 * SCALE) + ' 0 L 0 0 0 ' + (10 * SCALE)} fill="none" stroke="hsl(var(--border))" strokeWidth="1" strokeOpacity="0.42" vectorEffect="non-scaling-stroke" />
           </pattern>
         </defs>
 
-        {/* The walls */}
-        <path 
-          d={generateWallsPath()} 
-          fill="none" 
-          stroke="hsl(var(--foreground))" 
-          strokeWidth={8}
-          strokeLinecap="square"
-          strokeLinejoin="miter"
-        />
+        <rect x={0} y={0} width={fullWidth} height={fullHeight} fill={'url(#' + gridId + ')'} />
 
-        {/* The walls click targets and highlights */}
-        {getWallsForLayout(design.layout).map(drawWallSegment)}
-
-        {/* Base user inputs (Windows, Openings) */}
-        {design.windows.map((w, i) => drawElementOnWall(w.wall, w.offsetIn, w.widthIn, 'window', 'WIN', `window-${i}`))}
-        {design.openings.map((o, i) => drawElementOnWall(o.wall, o.offsetIn, o.widthIn, 'opening', 'OPEN', `opening-${i}`))}
-
-        {/* If we have a result, show generated modules. Otherwise show rough fixture placement */}
-        {result ? (
-          <>
-            {result.modules.map((m, i) => drawElementOnWall(m.wall, m.offsetIn, m.widthIn, m.category === 'fixture' ? 'fixture' : 'cabinet', m.label || 'CAB', `module-${i}`, m.category === 'base_cabinet'))}
-          </>
-        ) : (
-          <>
-            {design.fixtures.map((f, i) => drawElementOnWall(f.wall, f.offsetIn, f.widthIn, 'fixture', f.kind.toUpperCase(), `fixture-${i}`))}
-          </>
+        {design.layout === 'open' && (
+          <rect x={ox} y={oy} width={aIn * SCALE} height={roomDepthIn * SCALE} fill="hsl(var(--card) / 0.32)" stroke="none" />
         )}
 
-        {drawIsland()}
+        <path d={generateWallsPath()} fill="none" stroke="hsl(var(--foreground))" strokeWidth={6} strokeLinecap="square" strokeLinejoin="miter" vectorEffect="non-scaling-stroke" />
 
+        {getWallsForLayout(design.layout).map(drawWallSegment)}
+
+        {design.windows.map((window, index) => drawElementOnWall(window.wall, window.offsetIn, window.widthIn, 'window', 'WIN', 'window-' + index))}
+        {design.openings.map((opening, index) => drawElementOnWall(opening.wall, opening.offsetIn, opening.widthIn, 'opening', 'OPEN', 'opening-' + index))}
+
+        {result
+          ? result.modules.map((module, index) => {
+              const product = module.productId == null ? undefined : result.products.find(item => item.id === module.productId);
+              const type: PlanElementType = module.category === 'fixture' ? 'fixture' : 'cabinet';
+              const label = type === 'fixture' ? module.label.toUpperCase() : product?.sku || Math.round(module.widthIn) + '" CAB';
+              return drawElementOnWall(module.wall, module.offsetIn, module.widthIn, type, label, 'module-' + index);
+            })
+          : design.fixtures.map((fixture, index) => drawElementOnWall(fixture.wall, fixture.offsetIn, fixture.widthIn, 'fixture', fixture.kind.toUpperCase(), 'fixture-' + index))}
+
+        {drawIsland()}
       </svg>
-      
-      {/* Inline editor for selected wall */}
+
+      {!result && !selectedWall && (
+        <div className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] gap-1.5 overflow-x-auto rounded-md border bg-card/92 p-2 text-[9px] text-muted-foreground shadow-sm backdrop-blur sm:hidden">
+          <span className="whitespace-nowrap">Blue: cabinet</span><span>·</span><span className="whitespace-nowrap">Purple: fixture</span><span>·</span><span className="whitespace-nowrap">Tap a wall to edit</span>
+        </div>
+      )}
+
       {selectedWall && onChange && (
-        <Card className="absolute z-20 shadow-xl p-4 w-72 bg-card/95 backdrop-blur border-primary animate-in fade-in zoom-in-95"
-              style={{
-                top: Math.min(Math.max((getWallSegment(selectedWall)?.y1 || 0) + 20, 20), maxHeight - 200),
-                left: Math.min(Math.max((getWallSegment(selectedWall)?.x1 || 0) + 20, 20), maxWidth - 200)
-              }}
-        >
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-bold text-sm">Wall {selectedWall} Settings</h3>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedWall(null)}>
-              <X className="w-4 h-4" />
-            </Button>
+        <Card className="absolute bottom-3 left-3 right-3 z-20 max-h-[62%] overflow-y-auto border-primary/60 bg-card/96 p-4 shadow-xl backdrop-blur sm:bottom-auto sm:left-auto sm:right-4 sm:top-14 sm:w-72">
+          <div className="mb-3 flex items-center justify-between">
+            <div><p className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">Plan editor</p><h3 className="text-sm font-bold">Wall {selectedWall}</h3></div>
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => setSelectedWall(null)} aria-label="Close wall editor"><X className="size-4" /></Button>
           </div>
-          
+
           <div className="space-y-4">
             <div className="space-y-1">
               <Label className="text-xs">Length (in)</Label>
-              <Input 
-                type="number" 
-                className="h-8"
-                value={design.walls[selectedWall] || 0} 
-                onChange={(e) => onChange({ ...design, walls: { ...design.walls, [selectedWall]: Number(e.target.value) } })} 
-              />
+              <Input type="number" className="h-8" min={1} value={design.walls[selectedWall] || 0} onChange={(event) => onChange({ ...design, walls: { ...design.walls, [selectedWall]: Number(event.target.value) } })} />
             </div>
-            
-            <div className="pt-2 border-t space-y-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-xs">Windows</Label>
-                <Button variant="outline" size="sm" className="h-6 text-xs px-2 py-0" onClick={() => {
-                  onChange({
-                    ...design,
-                    windows: [...design.windows, { wall: selectedWall, offsetIn: 48, widthIn: 36, heightIn: 48, sillHeightIn: 36 }]
-                  });
+
+            <div className="space-y-2 border-t pt-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Windows on this wall</Label>
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => {
+                  const wallLength = Math.max(design.walls[selectedWall] || 60, 18);
+                  const widthIn = Math.min(36, Math.max(18, wallLength / 3));
+                  const offsetIn = Math.max(0, (wallLength - widthIn) / 2);
+                  onChange({ ...design, windows: [...design.windows, { wall: selectedWall, offsetIn, widthIn, heightIn: 48, sillHeightIn: 36 }] });
                 }}>
-                  <Plus className="w-3 h-3 mr-1" /> Add
+                  <Plus className="mr-1 size-3" /> Add
                 </Button>
               </div>
-              
-              <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                {design.windows.map((win, i) => win.wall === selectedWall && (
-                  <div key={i} className="grid grid-cols-2 gap-2 bg-muted/40 p-2 rounded text-xs relative">
-                    <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5" onClick={() => {
-                      onChange({ ...design, windows: design.windows.filter((_, idx) => idx !== i) });
-                    }}>
-                      <X className="w-3 h-3 text-destructive" />
-                    </Button>
-                    <div>
-                      <span className="opacity-70">Offset</span>
-                      <Input type="number" className="h-6 mt-1 text-xs" value={win.offsetIn} 
-                             onChange={(e) => {
-                               const newWin = [...design.windows];
-                               newWin[i].offsetIn = Number(e.target.value);
-                               onChange({...design, windows: newWin});
-                             }}/>
-                    </div>
-                    <div>
-                      <span className="opacity-70">Width</span>
-                      <Input type="number" className="h-6 mt-1 text-xs" value={win.widthIn}
-                             onChange={(e) => {
-                               const newWin = [...design.windows];
-                               newWin[i].widthIn = Number(e.target.value);
-                               onChange({...design, windows: newWin});
-                             }}/>
-                    </div>
-                    <div>
-                      <span className="opacity-70">Sill</span>
-                      <Input type="number" className="h-6 mt-1 text-xs" value={win.sillHeightIn}
-                             onChange={(e) => {
-                               const newWin = [...design.windows];
-                               newWin[i].sillHeightIn = Number(e.target.value);
-                               onChange({...design, windows: newWin});
-                             }}/>
-                    </div>
+
+              <div className="space-y-2">
+                {design.windows.filter(window => window.wall === selectedWall).length === 0 && <p className="text-xs text-muted-foreground">No windows on this wall.</p>}
+                {design.windows.map((window, index) => window.wall === selectedWall && (
+                  <div key={index} className="relative grid grid-cols-3 gap-2 rounded border bg-muted/30 p-2 pt-7 text-xs">
+                    <Button variant="ghost" size="icon" className="absolute right-1 top-1 size-5" onClick={() => onChange({ ...design, windows: design.windows.filter((_, itemIndex) => itemIndex !== index) })} aria-label="Remove window"><X className="size-3 text-destructive" /></Button>
+                    <label className="space-y-1"><span className="text-[9px] uppercase text-muted-foreground">Offset</span><Input type="number" className="h-7 text-xs" value={window.offsetIn} onChange={(event) => {
+                      const windows = [...design.windows]; windows[index] = { ...windows[index], offsetIn: Number(event.target.value) }; onChange({ ...design, windows });
+                    }} /></label>
+                    <label className="space-y-1"><span className="text-[9px] uppercase text-muted-foreground">Width</span><Input type="number" className="h-7 text-xs" value={window.widthIn} onChange={(event) => {
+                      const windows = [...design.windows]; windows[index] = { ...windows[index], widthIn: Number(event.target.value) }; onChange({ ...design, windows });
+                    }} /></label>
+                    <label className="space-y-1"><span className="text-[9px] uppercase text-muted-foreground">Sill</span><Input type="number" className="h-7 text-xs" value={window.sillHeightIn} onChange={(event) => {
+                      const windows = [...design.windows]; windows[index] = { ...windows[index], sillHeightIn: Number(event.target.value) }; onChange({ ...design, windows });
+                    }} /></label>
                   </div>
                 ))}
               </div>
@@ -441,7 +428,25 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
           </div>
         </Card>
       )}
-
+      </div>
+      {result && (
+        <div className="grid w-full shrink-0 grid-cols-[minmax(0,1fr)_64px_64px] border-2 border-foreground bg-card text-foreground sm:grid-cols-[minmax(0,1fr)_86px_86px]" aria-label="Floor plan title block">
+          <div className="min-w-0 px-2 py-2 sm:px-4 sm:py-3">
+            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em]">Apex Kitchens / Design Study</p>
+            <p className="mt-1 text-sm font-semibold leading-tight">Proposed floor plan</p>
+            <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{layoutLabel} kitchen · Concept only</p>
+            <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide">Not for construction</p>
+          </div>
+          <div className="flex flex-col justify-center border-l-2 border-foreground px-1.5 py-2 sm:px-3">
+            <span className="font-mono text-[9px] uppercase text-muted-foreground">Sheet</span>
+            <strong className="text-sm leading-tight">SK-01</strong>
+          </div>
+          <div className="flex flex-col justify-center border-l-2 border-foreground px-1.5 py-2 sm:px-3">
+            <span className="font-mono text-[9px] uppercase text-muted-foreground">Scale</span>
+            <strong className="text-sm leading-tight">NTS</strong>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

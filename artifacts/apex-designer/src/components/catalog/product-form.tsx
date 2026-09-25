@@ -232,7 +232,7 @@ export function ProductForm({ open, onOpenChange, product }: Props) {
               <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3 rounded-md flex gap-3 text-xs text-amber-800 dark:text-amber-400">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Verification Required:</strong> Products default to <em>demo</em> status. Changing to <em>verified</em> confirms you have reviewed dimensions, material, and stock levels for live quoting.
+                   <strong>Verification Required:</strong> Products default to <em>demo</em> status. Changing to <em>verified</em> makes a product available for live quoting. Check its dimensions, material, and stock levels first.
                 </p>
               </div>
             </div>
@@ -294,7 +294,7 @@ export function ProductForm({ open, onOpenChange, product }: Props) {
                   <FormItem><FormLabel>Product URL</FormLabel><FormControl><Input {...field} placeholder="https://..." value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="notes" render={({ field }) => (
-                  <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea {...field} placeholder="Internal notes..." className="h-20 text-xs" value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                   <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea {...field} placeholder="Product notes..." className="h-20 text-xs" value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
 

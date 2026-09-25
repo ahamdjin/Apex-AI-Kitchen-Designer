@@ -1,0 +1,1 @@
+- [Open catalog management](open-catalog-management.md) — the owner explicitly wants catalog administration available without an admin key.

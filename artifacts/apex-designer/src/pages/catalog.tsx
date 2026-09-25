@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useListProducts,
   useCreateProduct,
@@ -8,12 +8,12 @@ import {
   useGetCatalogSummary,
   getListProductsQueryKey,
   getGetCatalogSummaryQueryKey,
-  Product
+  Product,
 } from "@workspace/api-client-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Download, Upload, Search, Trash2, Edit } from "lucide-react";
+import { Plus, Upload, Search, Trash2, Edit } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -26,17 +26,24 @@ import { Badge } from "@/components/ui/badge";
 import { ProductForm } from "@/components/catalog/product-form";
 import { ImportDialog } from "@/components/catalog/import-dialog";
 import { formatCurrency } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-
-  const { data: products = [], isLoading } = useListProducts();
-  const { data: summary } = useGetCatalogSummary();
-  const deleteProduct = useDeleteProduct();
   const queryClient = useQueryClient();
+  const {
+    data: products = [],
+    isLoading,
+    error: productsError,
+  } = useListProducts({ query: { queryKey: getListProductsQueryKey(), refetchOnMount: "always" } });
+  const {
+    data: summary,
+    error: summaryError,
+  } = useGetCatalogSummary({ query: { queryKey: getGetCatalogSummaryQueryKey(), refetchOnMount: "always" } });
+  const deleteProduct = useDeleteProduct();
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -49,7 +56,9 @@ export default function Catalog() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetCatalogSummaryQueryKey() });
-      }
+        toast.success("Product deleted");
+      },
+      onError: () => toast.error("Could not delete product"),
     });
   };
 
@@ -59,7 +68,7 @@ export default function Catalog() {
         <div>
           <h1 className="text-3xl font-bold font-sans tracking-tight">Product Catalog</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Manage cabinet, countertop, and accessory offerings.
+            Browse and manage cabinet, countertop, and accessory offerings. Anyone with access to this app can change the catalog.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -76,6 +85,12 @@ export default function Catalog() {
           </Button>
         </div>
       </div>
+
+      {(productsError || summaryError) && (
+        <div role="alert" className="border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          The catalog could not be loaded. Please refresh and try again.
+        </div>
+      )}
 
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -134,6 +149,10 @@ export default function Catalog() {
                       Loading catalog...
                     </TableCell>
                   </TableRow>
+                ) : productsError ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-32 text-center text-destructive">Unable to load products.</TableCell>
+                  </TableRow>
                 ) : filteredProducts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
@@ -167,7 +186,7 @@ export default function Catalog() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex justify-end gap-2">
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -176,6 +195,7 @@ export default function Catalog() {
                               setEditingProduct(product);
                               setFormOpen(true);
                             }}
+                            aria-label={`Edit ${product.name}`}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -184,6 +204,7 @@ export default function Catalog() {
                             size="icon" 
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={() => handleDelete(product.id)}
+                            aria-label={`Delete ${product.name}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

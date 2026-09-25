@@ -51,6 +51,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Product"
+  /catalog/products:
+    get:
+      operationId: listPublicProducts
+      tags: [catalog]
+      summary: List public product catalog fields
+      responses:
+        "200":
+          description: Public product records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicProduct"
+    post:
+      operationId: createPublicProduct
+      tags: [catalog]
+      summary: Submit a demo product to the public catalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicProductInput"
+      responses:
+        "201":
+          description: Created demo product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProduct"
   /products/{id}:
     patch:
       operationId: updateProduct
@@ -194,6 +225,43 @@ components:
           required: [id]
           properties:
             id: { type: integer }
+    PublicProductInput:
+      type: object
+      additionalProperties: false
+      required: [sku, name, category]
+      properties:
+        sku: { type: string, minLength: 1, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        category: { type: string, enum: [base_cabinet, wall_cabinet, tall_cabinet, countertop, island, accessory] }
+        collection: { type: string, maxLength: 120 }
+        finish: { type: string, maxLength: 120 }
+        material: { type: string, maxLength: 120 }
+        widthIn: { type: ["number", "null"], minimum: 0.001 }
+        heightIn: { type: ["number", "null"], minimum: 0.001 }
+        depthIn: { type: ["number", "null"], minimum: 0.001 }
+        lengthIn: { type: ["number", "null"], minimum: 0.001 }
+        price: { type: ["number", "null"], minimum: 0.001 }
+        unit: { type: string, maxLength: 30 }
+        productUrl: { type: string, maxLength: 500 }
+    PublicProduct:
+      type: object
+      required: [id, sku, name, category, status]
+      properties:
+        id: { type: integer }
+        sku: { type: string }
+        name: { type: string }
+        category: { type: string, enum: [base_cabinet, wall_cabinet, tall_cabinet, countertop, island, accessory] }
+        collection: { type: ["string", "null"] }
+        finish: { type: ["string", "null"] }
+        material: { type: ["string", "null"] }
+        widthIn: { type: ["number", "null"] }
+        heightIn: { type: ["number", "null"] }
+        depthIn: { type: ["number", "null"] }
+        lengthIn: { type: ["number", "null"] }
+        price: { type: ["number", "null"] }
+        unit: { type: ["string", "null"] }
+        status: { type: string, enum: [demo, verified, inactive] }
+        productUrl: { type: ["string", "null"] }
     CatalogImportInput:
       type: object
       required: [csv]

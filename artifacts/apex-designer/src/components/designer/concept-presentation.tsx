@@ -117,7 +117,7 @@ export function ConceptPresentation({
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">Visual interpretation only. Catalog references and finishes may differ from the image; availability, pricing and specifications require confirmation.</p>
+            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">The image is generated from the selected catalog family and measured plan, but it remains an illustrative interpretation. Availability, pricing, exact finish appearance and specifications require confirmation.</p>
             {image?.disclaimer && <p data-testid="text-image-disclaimer" className="mt-2 text-xs leading-relaxed text-muted-foreground">{image.disclaimer}</p>}
           </div>
         </section>
@@ -135,7 +135,7 @@ export function ConceptPresentation({
               <Maximize2 className="size-3.5" aria-hidden="true" /> Maximize
             </Button>
           </div>
-          <div className="h-[390px] sm:h-[480px] xl:h-[min(48vw,610px)] min-h-[360px] relative bg-blueprint" data-testid="canvas-measured-plan">
+          <div className="relative h-[54dvh] min-h-[380px] max-h-[680px] sm:h-[60dvh] xl:h-[min(58vw,680px)] bg-blueprint" data-testid="canvas-measured-plan">
             <DesignerCanvas design={design} result={result} />
           </div>
           <p className="px-5 py-4 md:px-6 text-xs leading-relaxed text-muted-foreground border-t border-border/70">Measurements shown are based on your input. Verify all dimensions on site before ordering or fabrication.</p>
@@ -147,7 +147,7 @@ export function ConceptPresentation({
             <DialogTitle>{maximized === "plan" ? "Measured floor plan" : "Interior concept"}</DialogTitle>
             <DialogDescription>
               {maximized === "plan"
-                ? "Solid blue: base cabinet. Dashed blue inside: indicative upper cabinet. Verify dimensions on site."
+                ? "Blue outlines: catalog cabinets. Purple: fixtures. Windows and openings retain their measured wall positions. Verify dimensions on site."
                 : "Illustrative image; use the measured floor plan for dimensions."}
             </DialogDescription>
           </div>
