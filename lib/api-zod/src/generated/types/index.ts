@@ -9,6 +9,7 @@
 export * from './catalogImportInput';
 export * from './catalogSummary';
 export * from './deleteResult';
+export * from './designImage';
 export * from './designInput';
 export * from './designInputLayout';
 export * from './designInputWalls';

@@ -180,3 +180,8 @@ export interface DesignResult {
   verified: boolean;
 }
 
+export interface DesignImage {
+  imageDataUrl: string;
+  disclaimer: string;
+}
+

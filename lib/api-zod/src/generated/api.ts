@@ -258,3 +258,46 @@ export const GenerateDesignResponse = zod.object({
 })
 
 
+/**
+ * @summary Generate an illustrative photorealistic interior concept from measured geometry
+ */
+export const RenderDesignImageBody = zod.object({
+  "layout": zod.enum(['l', 'u', 'galley', 'single', 'open']),
+  "walls": zod.record(zod.string(), zod.number()),
+  "roomDepthIn": zod.number(),
+  "ceilingIn": zod.number(),
+  "windows": zod.array(zod.object({
+  "wall": zod.string(),
+  "offsetIn": zod.number(),
+  "widthIn": zod.number(),
+  "sillHeightIn": zod.number(),
+  "heightIn": zod.number()
+})),
+  "openings": zod.array(zod.object({
+  "wall": zod.string(),
+  "offsetIn": zod.number(),
+  "widthIn": zod.number()
+})),
+  "fixtures": zod.array(zod.object({
+  "kind": zod.enum(['sink', 'range', 'fridge', 'dishwasher']),
+  "wall": zod.string(),
+  "offsetIn": zod.number(),
+  "widthIn": zod.number()
+})),
+  "island": zod.object({
+  "mode": zod.enum(['none', 'existing', 'new']),
+  "widthIn": zod.number(),
+  "lengthIn": zod.number(),
+  "fromLeftIn": zod.number(),
+  "fromBackIn": zod.number()
+}),
+  "style": zod.string(),
+  "countertop": zod.string()
+})
+
+export const RenderDesignImageResponse = zod.object({
+  "imageDataUrl": zod.string(),
+  "disclaimer": zod.string()
+})
+
+

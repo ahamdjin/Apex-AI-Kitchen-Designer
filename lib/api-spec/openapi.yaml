@@ -136,6 +136,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DesignResult"
+  /designs/render:
+    post:
+      operationId: renderDesignImage
+      tags: [design]
+      summary: Generate an illustrative photorealistic interior concept from measured geometry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DesignInput"
+      responses:
+        "200":
+          description: Generated image for immediate display, not a fabrication drawing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DesignImage"
 components:
   schemas:
     HealthStatus:
@@ -281,3 +299,9 @@ components:
           items: { type: string }
         approximateTotal: { type: ["number", "null"] }
         verified: { type: boolean }
+    DesignImage:
+      type: object
+      required: [imageDataUrl, disclaimer]
+      properties:
+        imageDataUrl: { type: string }
+        disclaimer: { type: string }

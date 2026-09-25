@@ -6,11 +6,14 @@ import {
   UpdateProductResponse, DeleteProductParams, DeleteProductResponse,
   ListProductsResponse, ImportProductsBody, ImportProductsResponse,
   GetCatalogSummaryResponse, GenerateDesignBody, GenerateDesignResponse,
+  RenderDesignImageBody, RenderDesignImageResponse,
 } from "@workspace/api-zod";
 import { readCatalogCsv } from "../lib/catalog-csv";
 import { addAiNarrative, makeConcept } from "../lib/apex-design";
+import { renderKitchenImage } from "../lib/apex-render";
 
 const router: IRouter = Router();
+const renderAttempts = new Map<string, { count: number; resetAt: number }>();
 const visible = (row: typeof productsTable.$inferSelect) => {
   const { updatedAt: _updatedAt, ...product } = row;
   return product;
@@ -133,6 +136,46 @@ router.post("/designs/generate", async (req, res): Promise<void> => {
     res.json(GenerateDesignResponse.parse(described));
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+router.post("/designs/render", async (req, res): Promise<void> => {
+  const parsed = RenderDesignImageBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  let concept: ReturnType<typeof makeConcept>;
+  try {
+    const catalog = await db.select().from(productsTable);
+    concept = makeConcept(parsed.data, catalog);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+    return;
+  }
+
+  // This demo is publicly accessible. Limit costly generation per connecting IP.
+  const key = req.ip ?? "unknown";
+  const now = Date.now();
+  if (renderAttempts.size > 1000) {
+    for (const [ip, entry] of renderAttempts) if (entry.resetAt <= now) renderAttempts.delete(ip);
+  }
+  const previous = renderAttempts.get(key);
+  const entry = previous && previous.resetAt > now ? previous : { count: 0, resetAt: now + 15 * 60_000 };
+  if (entry.count >= 8) {
+    res.status(429).json({ error: "Image limit reached. Please try again in a few minutes." });
+    return;
+  }
+  entry.count++;
+  renderAttempts.set(key, entry);
+
+  try {
+    const imageDataUrl = await renderKitchenImage(parsed.data, concept);
+    res.json(RenderDesignImageResponse.parse({
+      imageDataUrl,
+      disclaimer: "Illustrative AI concept only. The measured floor plan, not this image, defines the layout. Materials, products, dimensions and fabrication must be confirmed by Apex.",
+    }));
+  } catch (error) {
+    req.log.error({ error }, "Kitchen image generation failed");
+    res.status(502).json({ error: "The photorealistic image could not be generated right now. Your measured floor plan is still available; please retry the image." });
   }
 });
 
