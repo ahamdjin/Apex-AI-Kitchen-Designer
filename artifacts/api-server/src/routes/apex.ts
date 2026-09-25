@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { db, productsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
@@ -11,21 +11,85 @@ import {
 import { readCatalogCsv } from "../lib/catalog-csv";
 import { addAiNarrative, makeConcept } from "../lib/apex-design";
 import { renderKitchenImage } from "../lib/apex-render";
+import { requireAdmin } from "../middlewares/admin-auth";
+import { consumeRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
-const renderAttempts = new Map<string, { count: number; resetAt: number }>();
+const FIFTEEN_MINUTES = 15 * 60_000;
+
 const visible = (row: typeof productsTable.$inferSelect) => {
   const { updatedAt: _updatedAt, ...product } = row;
   return product;
 };
 
+function parseLimit(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 500 ? parsed : fallback;
+}
+
+function clientRateKey(req: Request): string {
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const agent = (req.get("user-agent") || "unknown").slice(0, 160);
+  return `${ip}|${agent}`;
+}
+
+async function enforceRateLimit(
+  req: Request,
+  res: Response,
+  scope: string,
+  limit: number,
+): Promise<boolean> {
+  const state = await consumeRateLimit(scope, clientRateKey(req), limit, FIFTEEN_MINUTES);
+  res.setHeader("RateLimit-Limit", String(limit));
+  res.setHeader("RateLimit-Remaining", String(state.remaining));
+  res.setHeader("RateLimit-Reset", String(Math.ceil(state.resetAt.getTime() / 1000)));
+
+  if (state.allowed) return true;
+
+  res.setHeader("Retry-After", String(Math.max(1, Math.ceil((state.resetAt.getTime() - Date.now()) / 1000))));
+  res.status(429).json({ error: "Request limit reached. Please try again later." });
+  return false;
+}
+
 function productError(product: typeof productsTable.$inferInsert): string | null {
+  const requiredText = [
+    ["sku", product.sku, 100],
+    ["name", product.name, 200],
+  ] as const;
+  for (const [key, value, max] of requiredText) {
+    const normalized = value?.trim() ?? "";
+    if (!normalized) return `${key} is required.`;
+    if (normalized.length > max) return `${key} is too long.`;
+  }
+
+  const optionalText = [
+    ["collection", product.collection, 120],
+    ["finish", product.finish, 120],
+    ["material", product.material, 120],
+    ["unit", product.unit, 30],
+    ["notes", product.notes, 2000],
+    ["productUrl", product.productUrl, 500],
+  ] as const;
+  for (const [key, value, max] of optionalText) {
+    if ((value ?? "").length > max) return `${key} is too long.`;
+  }
+
+  if (product.productUrl?.trim()) {
+    try {
+      const url = new URL(product.productUrl);
+      if (url.protocol !== "https:" && url.protocol !== "http:") return "productUrl must use http or https.";
+    } catch {
+      return "productUrl must be a valid URL.";
+    }
+  }
+
   for (const key of ["widthIn", "heightIn", "depthIn", "lengthIn", "price", "cost", "stockQty"] as const) {
     const value = product[key];
     if (value != null && (!Number.isFinite(value) || value < 0 || (key !== "stockQty" && value === 0))) {
       return `${key} must be a positive number (stock may be zero).`;
     }
   }
+
   if (product.status !== "verified") return null;
   if (product.category === "countertop") {
     if (!product.material?.trim() || !product.widthIn || !product.lengthIn) {
@@ -38,6 +102,31 @@ function productError(product: typeof productsTable.$inferInsert): string | null
   }
   return null;
 }
+
+function designError(input: {
+  walls: Record<string, number>;
+  windows: unknown[];
+  openings: unknown[];
+  fixtures: unknown[];
+  style: string;
+  countertop: string;
+}): string | null {
+  if (input.windows.length > 20 || input.openings.length > 20 || input.fixtures.length > 20) {
+    return "Use no more than 20 windows, 20 openings and 20 fixtures per design.";
+  }
+  if (Object.keys(input.walls).some((key) => !["A", "B", "C"].includes(key))) {
+    return "Only walls A, B and C are supported.";
+  }
+  for (const [label, value] of [["style", input.style], ["countertop", input.countertop]] as const) {
+    if (value.length > 120) return `${label} must be 120 characters or fewer.`;
+    if (/[\u0000-\u001F\u007F]/.test(value)) return `${label} contains unsupported control characters.`;
+  }
+  return null;
+}
+
+// Catalog data contains internal cost/stock fields and is admin-only.
+router.use("/products", requireAdmin);
+router.use("/catalog-summary", requireAdmin);
 
 router.get("/products", async (_req, res): Promise<void> => {
   const records = await db.select().from(productsTable).orderBy(productsTable.id);
@@ -89,14 +178,19 @@ router.post("/products/import", async (req, res): Promise<void> => {
   let parsed: ReturnType<typeof readCatalogCsv>;
   try { parsed = readCatalogCsv(body.data.csv); }
   catch (error) { res.status(400).json({ error: (error as Error).message }); return; }
+
   let created = 0, updated = 0;
   const errors = [...parsed.errors];
   for (const [index, record] of parsed.records.entries()) {
     try {
+      const validationError = productError(record);
+      if (validationError) {
+        errors.push(`Row ${index + 2}: ${validationError}`);
+        continue;
+      }
       const existing = await db.select({ id: productsTable.id }).from(productsTable)
         .where(eq(productsTable.sku, record.sku)).limit(1);
       if (existing[0]) {
-        // A CSV cannot silently downgrade a manually verified product.
         const [current] = await db.select().from(productsTable).where(eq(productsTable.id, existing[0].id));
         if (current.status === "verified") {
           errors.push(`Row ${index + 2}: verified SKU ${record.sku} was skipped; edit it manually after review.`);
@@ -129,43 +223,37 @@ router.get("/catalog-summary", async (_req, res): Promise<void> => {
 router.post("/designs/generate", async (req, res): Promise<void> => {
   const parsed = GenerateDesignBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const validationError = designError(parsed.data);
+  if (validationError) { res.status(400).json({ error: validationError }); return; }
+
   try {
+    if (!await enforceRateLimit(req, res, "design", parseLimit("DESIGN_RATE_LIMIT_PER_15M", 30))) return;
     const catalog = await db.select().from(productsTable);
     const concept = makeConcept(parsed.data, catalog);
     const described = await addAiNarrative(parsed.data, concept);
     res.json(GenerateDesignResponse.parse(described));
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
+    req.log.warn({ error }, "Design generation rejected");
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not generate the design." });
   }
 });
 
 router.post("/designs/render", async (req, res): Promise<void> => {
   const parsed = RenderDesignImageBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const validationError = designError(parsed.data);
+  if (validationError) { res.status(400).json({ error: validationError }); return; }
 
   let concept: ReturnType<typeof makeConcept>;
   try {
+    if (!await enforceRateLimit(req, res, "render", parseLimit("RENDER_RATE_LIMIT_PER_15M", 8))) return;
     const catalog = await db.select().from(productsTable);
     concept = makeConcept(parsed.data, catalog);
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
+    req.log.warn({ error }, "Render request rejected");
+    res.status(400).json({ error: error instanceof Error ? error.message : "Could not prepare the render." });
     return;
   }
-
-  // This demo is publicly accessible. Limit costly generation per connecting IP.
-  const key = req.ip ?? "unknown";
-  const now = Date.now();
-  if (renderAttempts.size > 1000) {
-    for (const [ip, entry] of renderAttempts) if (entry.resetAt <= now) renderAttempts.delete(ip);
-  }
-  const previous = renderAttempts.get(key);
-  const entry = previous && previous.resetAt > now ? previous : { count: 0, resetAt: now + 15 * 60_000 };
-  if (entry.count >= 8) {
-    res.status(429).json({ error: "Image limit reached. Please try again in a few minutes." });
-    return;
-  }
-  entry.count++;
-  renderAttempts.set(key, entry);
 
   try {
     const imageDataUrl = await renderKitchenImage(parsed.data, concept);
