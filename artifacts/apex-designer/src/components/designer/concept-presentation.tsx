@@ -1,7 +1,9 @@
+import { useState } from "react";
 import type { DesignImage, DesignInput, DesignResult, Product } from "@workspace/api-client-react";
 import { DesignerCanvas } from "@/components/designer/canvas";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowUpRight, Camera, Ruler, RotateCw } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { AlertCircle, ArrowUpRight, Maximize2, RotateCw, SlidersHorizontal } from "lucide-react";
 
 interface Props {
   design: DesignInput;
@@ -11,6 +13,7 @@ interface Props {
   imageError: string | null;
   onRetry: () => void;
   onImageError: () => void;
+  onChangeConfiguration: () => void;
 }
 
 function productDescriptor(product: Product) {
@@ -18,8 +21,9 @@ function productDescriptor(product: Product) {
 }
 
 export function ConceptPresentation({
-  design, result, image, imageStatus, imageError, onRetry, onImageError,
+  design, result, image, imageStatus, imageError, onRetry, onImageError, onChangeConfiguration,
 }: Props) {
+  const [maximized, setMaximized] = useState<"concept" | "plan" | null>(null);
   const selectedIds = new Set(result.modules.map((module) => module.productId).filter((id): id is number => id != null));
   const selectedProducts = result.products.filter((product) => selectedIds.has(product.id));
   const cabinet = selectedProducts.find((product) => product.category.includes("cabinet"));
@@ -35,6 +39,15 @@ export function ConceptPresentation({
         </div>
         <h1 className="text-[clamp(1.65rem,3vw,2.6rem)] leading-[1.1] font-medium tracking-tight text-foreground">See the space. Check the plan.</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground leading-relaxed">An illustrative interior concept beside your measured cabinet layout. The image expresses a direction; the plan carries the dimensions.</p>
+        <Button
+          variant="outline"
+          className="mt-4 gap-2 bg-card"
+          onClick={onChangeConfiguration}
+          data-testid="button-change-configuration"
+        >
+          <SlidersHorizontal className="size-4" />
+          Change configuration
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,1fr)] gap-0 xl:gap-4 xl:p-5">
@@ -47,7 +60,9 @@ export function ConceptPresentation({
                 <p className="text-[11px] text-muted-foreground">Illustrative image · not a construction rendering</p>
               </div>
             </div>
-            <Camera className="size-4 text-muted-foreground" aria-hidden="true" />
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setMaximized("concept")} data-testid="button-maximize-concept">
+              <Maximize2 className="size-3.5" aria-hidden="true" /> Maximize
+            </Button>
           </div>
 
           <div className="relative aspect-[4/3] min-h-[280px] bg-[#e5dfd4] dark:bg-muted">
@@ -116,7 +131,9 @@ export function ConceptPresentation({
                 <p className="text-[11px] text-muted-foreground">Wall lengths, fixtures &amp; generated modules</p>
               </div>
             </div>
-            <Ruler className="size-4 text-muted-foreground" aria-hidden="true" />
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setMaximized("plan")} data-testid="button-maximize-plan">
+              <Maximize2 className="size-3.5" aria-hidden="true" /> Maximize
+            </Button>
           </div>
           <div className="h-[390px] sm:h-[480px] xl:h-[min(48vw,610px)] min-h-[360px] relative bg-blueprint" data-testid="canvas-measured-plan">
             <DesignerCanvas design={design} result={result} />
@@ -124,6 +141,35 @@ export function ConceptPresentation({
           <p className="px-5 py-4 md:px-6 text-xs leading-relaxed text-muted-foreground border-t border-border/70">Measurements shown are based on your input. Verify all dimensions on site before ordering or fabrication.</p>
         </section>
       </div>
+      <Dialog open={maximized !== null} onOpenChange={(open) => { if (!open) setMaximized(null); }}>
+        <DialogContent className="flex h-[92dvh] max-h-[92dvh] w-[96vw] max-w-[96vw] flex-col gap-3 overflow-hidden p-4 sm:max-w-[96vw]">
+          <div className="pr-10">
+            <DialogTitle>{maximized === "plan" ? "Measured floor plan" : "Interior concept"}</DialogTitle>
+            <DialogDescription>
+              {maximized === "plan"
+                ? "Solid blue: base cabinet. Dashed blue inside: indicative upper cabinet. Verify dimensions on site."
+                : "Illustrative image; use the measured floor plan for dimensions."}
+            </DialogDescription>
+          </div>
+          <div className="min-h-0 flex-1 relative overflow-hidden bg-blueprint" data-testid="maximized-visual">
+            {maximized === "plan" ? (
+              <DesignerCanvas design={design} result={result} />
+            ) : imageStatus === "ready" && image ? (
+              <img src={image.imageDataUrl} alt="Enlarged illustrative kitchen interior" className="h-full w-full object-contain bg-[#e5dfd4]" onError={onImageError} />
+            ) : imageStatus === "error" ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
+                <p>{imageError || "The image could not be made."}</p>
+                <Button onClick={onRetry}>Retry image</Button>
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center p-4 text-center" role="status">Composing your kitchen view… The measured plan is already available.</div>
+            )}
+          </div>
+          <Button variant="outline" className="self-start gap-2" onClick={() => { setMaximized(null); onChangeConfiguration(); }}>
+            <SlidersHorizontal className="size-4" /> Change configuration
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

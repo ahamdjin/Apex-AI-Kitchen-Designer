@@ -15,8 +15,7 @@ interface Props {
 
 export function DesignerCanvas({ design, result, onChange }: Props) {
   
-  // A simplistic mapping to SVG 2D top-down view.
-  // We'll map 1 inch = 4 pixels for drawing.
+  // One inch is four SVG units in the measured plan.
   const SCALE = 4;
   
   const [selectedWall, setSelectedWall] = useState<string | null>(null);
@@ -139,7 +138,7 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
       </g>
     );
   };
-  const drawElementOnWall = (wall: string, offset: number, width: number, type: 'window' | 'opening' | 'fixture' | 'cabinet', label: string, itemKey: string) => {
+  const drawElementOnWall = (wall: string, offset: number, width: number, type: 'window' | 'opening' | 'fixture' | 'cabinet', label: string, itemKey: string, showUpper = false) => {
     const seg = getWallSegment(wall);
     if (!seg) return null;
 
@@ -188,9 +187,8 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
       fill = "rgba(168, 85, 247, 0.2)";
       depthColor = "#d8b4fe";
     } else if (type === 'cabinet') {
-      stroke = "hsl(var(--border))";
+      stroke = "hsl(var(--primary))";
       fill = "hsl(var(--card))";
-      depthColor = "hsl(var(--muted-foreground) / 0.2)";
     }
 
     // Box rotation
@@ -199,8 +197,8 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
     // Make it look 3D by adding a shadow/depth polygon
     return (
       <g key={itemKey} transform={`translate(${cx}, ${cy}) rotate(${angle})`}>
-        {/* Depth shadow */}
-        {(type === 'cabinet' || type === 'fixture') && (
+        {/* Fixtures retain their visual distinction; cabinet symbols stay flat. */}
+        {type === 'fixture' && (
           <polygon 
             points={`${-widthScaled/2},${depth/2} ${widthScaled/2},${depth/2} ${widthScaled/2 + 4},${depth/2 + 4} ${-widthScaled/2 + 4},${depth/2 + 4}`}
             fill={depthColor}
@@ -214,8 +212,22 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
           fill={fill} 
           stroke={stroke} 
           strokeWidth={strokeWidth}
-          className="transition-all duration-300 shadow-xl"
+          className="transition-all duration-300"
         />
+        {type === 'cabinet' && showUpper && widthScaled > 16 && (
+          <rect
+            x={-widthScaled / 2 + 6}
+            y={-depth / 2 + 6}
+            width={widthScaled - 12}
+            height={depth / 2 - 12}
+            fill="none"
+            stroke="hsl(var(--primary))"
+            strokeWidth={2}
+            strokeDasharray="7 5"
+            pointerEvents="none"
+            aria-label="Upper cabinet, shown dashed within base cabinet footprint"
+          />
+        )}
         {(type === 'fixture' || type === 'cabinet') && (
           <text 
             x={0} 
@@ -283,7 +295,11 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
       <div className="absolute top-4 left-4 bg-card/90 backdrop-blur border p-3 rounded-lg shadow-sm text-xs font-mono space-y-2 pointer-events-none z-10">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 border-2 border-primary bg-card"></div>
-          <span>Cabinet</span>
+          <span>Base cabinet</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 border-2 border-dashed border-primary bg-card"></div>
+          <span>Upper cabinet (concept)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 border-2 border-purple-500 bg-purple-500/20"></div>
@@ -332,7 +348,7 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
         {/* If we have a result, show generated modules. Otherwise show rough fixture placement */}
         {result ? (
           <>
-            {result.modules.map((m, i) => drawElementOnWall(m.wall, m.offsetIn, m.widthIn, m.category === 'fixture' ? 'fixture' : 'cabinet', m.label || 'CAB', `module-${i}`))}
+            {result.modules.map((m, i) => drawElementOnWall(m.wall, m.offsetIn, m.widthIn, m.category === 'fixture' ? 'fixture' : 'cabinet', m.label || 'CAB', `module-${i}`, m.category === 'base_cabinet'))}
           </>
         ) : (
           <>

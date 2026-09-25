@@ -104,6 +104,7 @@ export default function Designer() {
     setImage(null);
     setImageError(null);
     setImageStatus("loading");
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
   const handleRetry = () => {
@@ -120,6 +121,7 @@ export default function Designer() {
       imageStatus={imageStatus}
       imageError={imageError}
       onRetry={handleRetry}
+      onChangeConfiguration={handleEdit}
       onImageError={() => {
         setImage(null);
         setImageError("The returned image could not be displayed. Please retry.");
