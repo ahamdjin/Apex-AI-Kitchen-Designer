@@ -317,7 +317,8 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
   }[design.layout];
 
   return (
-    <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden select-none">
+    <div className={`relative flex h-full min-h-0 w-full flex-col overflow-hidden select-none ${result ? 'bg-muted/60 p-2 sm:p-3' : ''}`}>
+      <div className={`relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden ${result ? 'border-2 border-b-0 border-foreground bg-card' : ''}`}>
       <div className="absolute left-3 top-3 z-10 hidden max-w-[220px] rounded-md border bg-card/92 p-3 text-[11px] shadow-sm backdrop-blur sm:block">
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Measured plan</p>
         <p className="mt-1 font-medium">{layoutLabel}</p>
@@ -374,7 +375,7 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
         {drawIsland()}
       </svg>
 
-      {!selectedWall && (
+      {!result && !selectedWall && (
         <div className="absolute bottom-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] gap-1.5 overflow-x-auto rounded-md border bg-card/92 p-2 text-[9px] text-muted-foreground shadow-sm backdrop-blur sm:hidden">
           <span className="whitespace-nowrap">Blue: cabinet</span><span>·</span><span className="whitespace-nowrap">Purple: fixture</span><span>·</span><span className="whitespace-nowrap">Tap a wall to edit</span>
         </div>
@@ -426,6 +427,25 @@ export function DesignerCanvas({ design, result, onChange }: Props) {
             </div>
           </div>
         </Card>
+      )}
+      </div>
+      {result && (
+        <div className="grid w-full shrink-0 grid-cols-[minmax(0,1fr)_64px_64px] border-2 border-foreground bg-card text-foreground sm:grid-cols-[minmax(0,1fr)_86px_86px]" aria-label="Floor plan title block">
+          <div className="min-w-0 px-2 py-2 sm:px-4 sm:py-3">
+            <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em]">Apex Kitchens / Design Study</p>
+            <p className="mt-1 text-sm font-semibold leading-tight">Proposed floor plan</p>
+            <p className="mt-1 text-[10px] leading-tight text-muted-foreground">{layoutLabel} kitchen · Concept only</p>
+            <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide">Not for construction</p>
+          </div>
+          <div className="flex flex-col justify-center border-l-2 border-foreground px-1.5 py-2 sm:px-3">
+            <span className="font-mono text-[9px] uppercase text-muted-foreground">Sheet</span>
+            <strong className="text-sm leading-tight">SK-01</strong>
+          </div>
+          <div className="flex flex-col justify-center border-l-2 border-foreground px-1.5 py-2 sm:px-3">
+            <span className="font-mono text-[9px] uppercase text-muted-foreground">Scale</span>
+            <strong className="text-sm leading-tight">NTS</strong>
+          </div>
+        </div>
       )}
     </div>
   );
