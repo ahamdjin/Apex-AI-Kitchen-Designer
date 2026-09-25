@@ -23,7 +23,6 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
   /products:
     get:
-      security: [{ AdminBearer: [] }]
       operationId: listProducts
       tags: [catalog]
       summary: List available product records including demo status
@@ -37,7 +36,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/Product"
     post:
-      security: [{ AdminBearer: [] }]
       operationId: createProduct
       tags: [catalog]
       requestBody:
@@ -86,7 +84,6 @@ paths:
                 $ref: "#/components/schemas/PublicProduct"
   /products/{id}:
     patch:
-      security: [{ AdminBearer: [] }]
       operationId: updateProduct
       tags: [catalog]
       parameters:
@@ -109,7 +106,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Product"
     delete:
-      security: [{ AdminBearer: [] }]
       operationId: deleteProduct
       tags: [catalog]
       parameters:
@@ -127,7 +123,6 @@ paths:
                 $ref: "#/components/schemas/DeleteResult"
   /products/import:
     post:
-      security: [{ AdminBearer: [] }]
       operationId: importProducts
       tags: [catalog]
       summary: Import an Excel-exported CSV, upserting by SKU
@@ -146,7 +141,6 @@ paths:
                 $ref: "#/components/schemas/ImportResult"
   /catalog-summary:
     get:
-      security: [{ AdminBearer: [] }]
       operationId: getCatalogSummary
       tags: [catalog]
       responses:
@@ -192,11 +186,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/DesignImage"
 components:
-  securitySchemes:
-    AdminBearer:
-      type: http
-      scheme: bearer
-      bearerFormat: opaque-admin-key
   schemas:
     HealthStatus:
       type: object

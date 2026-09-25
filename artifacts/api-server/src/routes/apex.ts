@@ -12,7 +12,6 @@ import {
 import { readCatalogCsv } from "../lib/catalog-csv";
 import { addAiNarrative, makeConcept, normalizeDesignInput } from "../lib/apex-design";
 import { renderKitchenImage } from "../lib/apex-render";
-import { requireAdmin } from "../middlewares/admin-auth";
 import { consumeRateLimit } from "../lib/rate-limit";
 
 const router: IRouter = Router();
@@ -236,12 +235,13 @@ router.post("/catalog/products", async (req, res): Promise<void> => {
   }
 });
 
-router.get("/products", requireAdmin, async (_req, res): Promise<void> => {
+router.get("/products", async (_req, res): Promise<void> => {
   const records = await db.select().from(productsTable).orderBy(productsTable.id);
   res.json(ListProductsResponse.parse(records.map(visible)));
 });
 
-router.post("/products", requireAdmin, async (req, res): Promise<void> => {
+router.post("/products", async (req, res): Promise<void> => {
+  if (!await enforceRateLimit(req, res, "catalog-create", parseLimit("CATALOG_CREATE_RATE_LIMIT_PER_15M", 20))) return;
   const parsed = CreateProductBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const validationError = productError(parsed.data);
@@ -255,7 +255,8 @@ router.post("/products", requireAdmin, async (req, res): Promise<void> => {
   }
 });
 
-router.patch("/products/:id", requireAdmin, async (req, res): Promise<void> => {
+router.patch("/products/:id", async (req, res): Promise<void> => {
+  if (!await enforceRateLimit(req, res, "catalog-update", parseLimit("CATALOG_UPDATE_RATE_LIMIT_PER_15M", 120))) return;
   const params = UpdateProductParams.safeParse(req.params);
   const body = UpdateProductBody.safeParse(req.body);
   if (!params.success || !body.success) { res.status(400).json({ error: "Invalid product id or fields." }); return; }
@@ -273,14 +274,16 @@ router.patch("/products/:id", requireAdmin, async (req, res): Promise<void> => {
   }
 });
 
-router.delete("/products/:id", requireAdmin, async (req, res): Promise<void> => {
+router.delete("/products/:id", async (req, res): Promise<void> => {
+  if (!await enforceRateLimit(req, res, "catalog-delete", parseLimit("CATALOG_DELETE_RATE_LIMIT_PER_15M", 30))) return;
   const params = DeleteProductParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: "Invalid product id." }); return; }
   const [record] = await db.delete(productsTable).where(eq(productsTable.id, params.data.id)).returning();
   res.json(DeleteProductResponse.parse({ deleted: !!record }));
 });
 
-router.post("/products/import", requireAdmin, async (req, res): Promise<void> => {
+router.post("/products/import", async (req, res): Promise<void> => {
+  if (!await enforceRateLimit(req, res, "catalog-import", parseLimit("CATALOG_IMPORT_RATE_LIMIT_PER_15M", 5))) return;
   const body = ImportProductsBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: body.error.message }); return; }
   let parsed: ReturnType<typeof readCatalogCsv>;
@@ -317,7 +320,7 @@ router.post("/products/import", requireAdmin, async (req, res): Promise<void> =>
   res.json(ImportProductsResponse.parse({ created, updated, errors }));
 });
 
-router.get("/catalog-summary", requireAdmin, async (_req, res): Promise<void> => {
+router.get("/catalog-summary", async (_req, res): Promise<void> => {
   const rows = await db.select().from(productsTable);
   res.json(GetCatalogSummaryResponse.parse({
     total: rows.length,

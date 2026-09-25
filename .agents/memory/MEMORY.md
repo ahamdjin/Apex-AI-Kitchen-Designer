@@ -1,1 +1,1 @@
-- [Public catalog contributions](public-catalog-contributions.md) — accept public submissions without granting admin access; keep their status distinct from reviewed inventory.
+- [Open catalog management](open-catalog-management.md) — the owner explicitly wants catalog administration available without an admin key.

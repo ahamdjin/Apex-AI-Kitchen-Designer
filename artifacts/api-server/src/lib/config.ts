@@ -9,9 +9,6 @@ function requireSecret(name: string, minimumLength: number): string {
 export function assertProductionConfig(): void {
   if (process.env.NODE_ENV !== "production") return;
 
-  // Public catalog and design routes can run without admin credentials.
-  // requireAdmin returns 503 for private routes when the key is absent.
-  if (process.env.APEX_ADMIN_KEY?.trim()) requireSecret("APEX_ADMIN_KEY", 32);
   if (process.env.RATE_LIMIT_SALT?.trim()) {
     requireSecret("RATE_LIMIT_SALT", 16);
   } else {
