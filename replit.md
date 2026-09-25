@@ -18,7 +18,7 @@ Measurement-driven kitchen concept designer backed by an Apex product catalog. G
 - Express 5
 - PostgreSQL + Drizzle ORM
 - OpenAPI + Orval + Zod
-- OpenAI narrative and image generation
+- OpenAI narrative and catalog-grounded image generation
 
 ## Production environment
 
@@ -43,7 +43,9 @@ Important:
 
 ## Design integrity
 
-The measured plan is authoritative. AI images are illustrative only and are never fabrication drawings. Product verification, inventory, slab yield, code clearances, and installation must still be confirmed by Apex.
+The measured plan is authoritative. The backend ranks active catalog products using the user's style/material request, verification state, stock state, product metadata, and cabinet-family consistency before it creates the layout. The image prompt receives those selected catalog references plus the measured cabinet/fixture runs. AI images are still illustrative only and are never fabrication drawings. Product verification, inventory, slab yield, code clearances, and installation must still be confirmed by Apex.
+
+Image generation defaults to `gpt-image-2` and falls back to `gpt-image-1` only when the deployment gateway rejects the newer model. Set `OPENAI_IMAGE_MODEL` to explicitly pin a supported image model.
 
 The Open / Island Only layout intentionally creates no perimeter cabinet run, but Wall A remains a valid measured room edge for windows, openings, and fixtures.
 
