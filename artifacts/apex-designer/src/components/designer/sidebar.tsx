@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Plus, X, Wand2 } from "lucide-react";
-import type { DesignInput, WindowInput, OpeningInput, FixtureInput } from "@workspace/api-client-react";
-import { getWallsForLayout } from "@/lib/design-state";
+import type { DesignInput, DesignInputLayout, WindowInput, OpeningInput, FixtureInput } from "@workspace/api-client-react";
+import { getWallsForLayout, normalizeDesignInput } from "@/lib/design-state";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Props {
@@ -24,7 +24,7 @@ interface Props {
 export function DesignerSidebar({ design, onChange, onGenerate, isGenerating, generationError }: Props) {
   
   const updateDesign = (updates: Partial<DesignInput>) => {
-    onChange({ ...design, ...updates });
+    onChange(normalizeDesignInput({ ...design, ...updates }));
   };
 
   const updateWall = (wall: string, lengthIn: number) => {
@@ -124,7 +124,7 @@ export function DesignerSidebar({ design, onChange, onGenerate, isGenerating, ge
                   <Label>Layout Type</Label>
                   <Select 
                     value={design.layout} 
-                    onValueChange={(v: any) => updateDesign({ layout: v })}
+                    onValueChange={(v) => updateDesign({ layout: v as DesignInputLayout })}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>

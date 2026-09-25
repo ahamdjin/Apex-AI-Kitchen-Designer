@@ -67,6 +67,116 @@ export type Product = ProductInput & {
   id: number;
 };
 
+export type PublicProductInputCategory = typeof PublicProductInputCategory[keyof typeof PublicProductInputCategory];
+
+
+export const PublicProductInputCategory = {
+  base_cabinet: 'base_cabinet',
+  wall_cabinet: 'wall_cabinet',
+  tall_cabinet: 'tall_cabinet',
+  countertop: 'countertop',
+  island: 'island',
+  accessory: 'accessory',
+} as const;
+
+export interface PublicProductInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  sku: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  category: PublicProductInputCategory;
+  /** @maxLength 120 */
+  collection?: string;
+  /** @maxLength 120 */
+  finish?: string;
+  /** @maxLength 120 */
+  material?: string;
+  /**
+     * @minimum 0.001
+     * @nullable
+     */
+  widthIn?: number | null;
+  /**
+     * @minimum 0.001
+     * @nullable
+     */
+  heightIn?: number | null;
+  /**
+     * @minimum 0.001
+     * @nullable
+     */
+  depthIn?: number | null;
+  /**
+     * @minimum 0.001
+     * @nullable
+     */
+  lengthIn?: number | null;
+  /**
+     * @minimum 0.001
+     * @nullable
+     */
+  price?: number | null;
+  /** @maxLength 30 */
+  unit?: string;
+  /** @maxLength 500 */
+  productUrl?: string;
+}
+
+export type PublicProductCategory = typeof PublicProductCategory[keyof typeof PublicProductCategory];
+
+
+export const PublicProductCategory = {
+  base_cabinet: 'base_cabinet',
+  wall_cabinet: 'wall_cabinet',
+  tall_cabinet: 'tall_cabinet',
+  countertop: 'countertop',
+  island: 'island',
+  accessory: 'accessory',
+} as const;
+
+export type PublicProductStatus = typeof PublicProductStatus[keyof typeof PublicProductStatus];
+
+
+export const PublicProductStatus = {
+  demo: 'demo',
+  verified: 'verified',
+  inactive: 'inactive',
+} as const;
+
+export interface PublicProduct {
+  id: number;
+  sku: string;
+  name: string;
+  category: PublicProductCategory;
+  /** @nullable */
+  collection?: string | null;
+  /** @nullable */
+  finish?: string | null;
+  /** @nullable */
+  material?: string | null;
+  /** @nullable */
+  widthIn?: number | null;
+  /** @nullable */
+  heightIn?: number | null;
+  /** @nullable */
+  depthIn?: number | null;
+  /** @nullable */
+  lengthIn?: number | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  unit?: string | null;
+  status: PublicProductStatus;
+  /** @nullable */
+  productUrl?: string | null;
+}
+
 export interface CatalogImportInput {
   csv: string;
 }

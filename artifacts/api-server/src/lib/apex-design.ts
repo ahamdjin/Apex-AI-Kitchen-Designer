@@ -17,6 +17,123 @@ const STOP_WORDS = new Set([
   "look", "color", "colour", "finish", "material", "countertop", "countertops",
 ]);
 
+const DEFAULT_DESIGN = {
+  layout: "u",
+  walls: { A: 144, B: 120, C: 144 },
+  roomDepthIn: 144,
+  ceilingIn: 96,
+  island: { mode: "none", widthIn: 36, lengthIn: 72, fromLeftIn: 48, fromBackIn: 48 },
+  style: "Modern Minimalist",
+  countertop: "Quartz",
+} as const;
+
+const layoutWalls: Record<string, string[]> = {
+  single: ["A"],
+  l: ["A", "B"],
+  u: ["A", "B", "C"],
+  galley: ["A", "B"],
+  open: ["A"],
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function own(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+/**
+ * Adds defaults only for omitted values and discards feature references to
+ * walls removed by the selected layout. Explicitly supplied invalid values are
+ * preserved so the API schema/measurement validation can report them.
+ *
+ * The unknown return type is intentional: callers can pass this result into
+ * their request schema's safeParse before using it as a DesignInput.
+ */
+export function normalizeDesignInput(input: unknown): unknown {
+  if (!isRecord(input)) return input;
+
+  const output: Record<string, unknown> = { ...input };
+  if (!own(input, "layout")) output.layout = DEFAULT_DESIGN.layout;
+  const layout = typeof output.layout === "string" ? output.layout : "";
+  const activeWalls = layoutWalls[layout];
+  if (activeWalls) {
+    if (!own(input, "walls")) {
+      output.walls = Object.fromEntries(activeWalls.map(wall => [
+        wall,
+        DEFAULT_DESIGN.walls[wall as keyof typeof DEFAULT_DESIGN.walls] ?? 120,
+      ]));
+    } else if (isRecord(input.walls)) {
+      const walls: Record<string, unknown> = Object.fromEntries(
+        Object.entries(input.walls).filter(([wall]) =>
+          !["A", "B", "C"].includes(wall) || activeWalls.includes(wall)),
+      );
+      for (const wall of activeWalls) {
+        walls[wall] = own(input.walls, wall)
+          ? input.walls[wall]
+          : DEFAULT_DESIGN.walls[wall as keyof typeof DEFAULT_DESIGN.walls] ?? 120;
+      }
+      output.walls = walls;
+    }
+
+    for (const featureKey of ["windows", "openings", "fixtures"] as const) {
+      if (!own(input, featureKey)) {
+        output[featureKey] = [];
+      } else if (Array.isArray(input[featureKey])) {
+        // Keep malformed feature entries so safeParse can reject them; only a
+        // known wall reference removed by the layout is discarded. Unknown
+        // wall IDs must survive for route/domain validation to reject.
+        output[featureKey] = input[featureKey].filter(item =>
+          !isRecord(item) || typeof item.wall !== "string" ||
+          !["A", "B", "C"].includes(item.wall) || activeWalls.includes(item.wall));
+      }
+    }
+  }
+
+  if (!own(input, "roomDepthIn")) output.roomDepthIn = DEFAULT_DESIGN.roomDepthIn;
+  if (!own(input, "ceilingIn")) output.ceilingIn = DEFAULT_DESIGN.ceilingIn;
+  if (!own(input, "style")) output.style = DEFAULT_DESIGN.style;
+  if (!own(input, "countertop")) output.countertop = DEFAULT_DESIGN.countertop;
+
+  if (!own(input, "island")) {
+    output.island = { ...DEFAULT_DESIGN.island };
+  } else if (isRecord(input.island)) {
+    const island: Record<string, unknown> = { ...input.island };
+    const defaults = DEFAULT_DESIGN.island;
+    const roomDepth = typeof output.roomDepthIn === "number" && Number.isFinite(output.roomDepthIn)
+      ? output.roomDepthIn
+      : DEFAULT_DESIGN.roomDepthIn;
+    const walls = isRecord(output.walls) ? output.walls : {};
+    const roomWidth = layout === "u" || layout === "l"
+      ? walls.B
+      : layout === "open" || layout === "single"
+        ? walls.A
+        : roomDepth;
+    const usableWidth = typeof roomWidth === "number" && Number.isFinite(roomWidth) ? roomWidth : 120;
+    const widthDefault = Math.min(defaults.widthIn, Math.max(18, usableWidth));
+    const lengthDefault = Math.min(defaults.lengthIn, Math.max(24, roomDepth));
+    if (!own(input.island, "mode")) island.mode = defaults.mode;
+    if (!own(input.island, "widthIn")) island.widthIn = widthDefault;
+    if (!own(input.island, "lengthIn")) island.lengthIn = lengthDefault;
+    if (!own(input.island, "fromLeftIn")) {
+      const width = typeof island.widthIn === "number" && Number.isFinite(island.widthIn)
+        ? island.widthIn
+        : widthDefault;
+      island.fromLeftIn = Math.min(defaults.fromLeftIn, Math.max(0, usableWidth - width));
+    }
+    if (!own(input.island, "fromBackIn")) {
+      const length = typeof island.lengthIn === "number" && Number.isFinite(island.lengthIn)
+        ? island.lengthIn
+        : lengthDefault;
+      island.fromBackIn = Math.min(defaults.fromBackIn, Math.max(0, roomDepth - length));
+    }
+    output.island = island;
+  }
+
+  return output;
+}
+
 function normalize(value: string | null | undefined): string {
   return (value ?? "")
     .toLowerCase()
@@ -110,7 +227,8 @@ function publicProduct(product: ProductRecord) {
   return visible;
 }
 
-export function makeConcept(input: Design, catalog: ProductRecord[]) {
+export function makeConcept(rawInput: Design, catalog: ProductRecord[]) {
+  const input = normalizeDesignInput(rawInput) as Design;
   const warnings: string[] = [];
   const modules: Module[] = [];
   const selected = new Map<number, ProductRecord>();
@@ -280,6 +398,33 @@ export function makeConcept(input: Design, catalog: ProductRecord[]) {
     }
   }
 
+  // Open-plan layouts have no perimeter cabinet run, but wall A still
+  // represents the measured room-width edge and may carry explicitly placed
+  // fixtures. Include only those fixture modules; never synthesize cabinets.
+  if (input.layout === "open") {
+    for (const fixture of input.fixtures.filter(item => item.wall === "A")) {
+      let fixtureProduct: ProductRecord | null = null;
+      if (fixture.kind === "sink") {
+        fixtureProduct = rankProducts(
+          sinkCandidates.filter(product => Math.abs((product.widthIn ?? fixture.widthIn) - fixture.widthIn) <= 6),
+          input.style,
+          preferredBase,
+          product => 30 - Math.abs((product.widthIn ?? fixture.widthIn) - fixture.widthIn) * 4,
+        )[0] ?? null;
+        if (fixtureProduct) selected.set(fixtureProduct.id, fixtureProduct);
+      }
+
+      modules.push({
+        wall: fixture.wall,
+        offsetIn: fixture.offsetIn,
+        widthIn: fixture.widthIn,
+        category: "fixture",
+        label: fixture.kind,
+        productId: fixtureProduct?.id ?? null,
+      });
+    }
+  }
+
   const countertops = active.filter(product => product.category === "countertop");
   const countertop = rankProducts(countertops, input.countertop)[0] ?? null;
   if (countertop) {
@@ -369,7 +514,8 @@ export function makeConcept(input: Design, catalog: ProductRecord[]) {
   };
 }
 
-export async function addAiNarrative(input: Design, result: ReturnType<typeof makeConcept>) {
+export async function addAiNarrative(rawInput: Design, result: ReturnType<typeof makeConcept>) {
+  const input = normalizeDesignInput(rawInput) as Design;
   if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || !process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
     return {
       ...result,

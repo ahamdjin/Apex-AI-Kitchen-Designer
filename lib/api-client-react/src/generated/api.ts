@@ -29,7 +29,9 @@ import type {
   HealthStatus,
   ImportResult,
   Product,
-  ProductInput
+  ProductInput,
+  PublicProduct,
+  PublicProductInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -287,6 +289,171 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateProductMutationOptions(options));
+    }
+
+export const getListPublicProductsUrl = () => {
+
+
+
+
+  return `/api/catalog/products`
+}
+
+/**
+ * @summary List public product catalog fields
+ */
+export const listPublicProducts = async ( options?: Parameters<typeof customFetch>[1]): Promise<PublicProduct[]> => {
+
+  return customFetch<PublicProduct[]>(getListPublicProductsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPublicProductsQueryKey = () => {
+    return [
+    `/api/catalog/products`
+    ] as const;
+    }
+
+
+export const getListPublicProductsQueryOptions = <TData = Awaited<ReturnType<typeof listPublicProducts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublicProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPublicProductsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPublicProducts>>> = ({ signal }) => listPublicProducts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPublicProducts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPublicProductsQueryResult = NonNullable<Awaited<ReturnType<typeof listPublicProducts>>>
+export type ListPublicProductsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List public product catalog fields
+ */
+
+export function useListPublicProducts<TData = Awaited<ReturnType<typeof listPublicProducts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublicProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPublicProductsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePublicProductUrl = () => {
+
+
+
+
+  return `/api/catalog/products`
+}
+
+/**
+ * @summary Submit a demo product to the public catalog
+ */
+export const createPublicProduct = async (publicProductInput: PublicProductInput, options?: Parameters<typeof customFetch>[1]): Promise<PublicProduct> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<PublicProduct>(getCreatePublicProductUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(publicProductInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePublicProductMutationKey = () => ['createPublicProduct'] as const;
+
+export const getCreatePublicProductMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicProduct>>, TError,CreatePublicProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPublicProduct>>, TError,CreatePublicProductMutationVariables, TContext> => {
+
+const mutationKey = getCreatePublicProductMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPublicProduct>>, CreatePublicProductMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPublicProduct(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePublicProductMutationResult = NonNullable<Awaited<ReturnType<typeof createPublicProduct>>>
+    export type CreatePublicProductMutationBody = BodyType<PublicProductInput>
+    export type CreatePublicProductMutationError = ErrorType<unknown>
+    export type CreatePublicProductMutationVariables = {data: BodyType<PublicProductInput>}
+
+    /**
+ * @summary Submit a demo product to the public catalog
+ */
+export const useCreatePublicProduct = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPublicProduct>>, TError,CreatePublicProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPublicProduct>>,
+        TError,
+        CreatePublicProductMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePublicProductMutationOptions(options));
     }
 
 export const getUpdateProductUrl = (id: number,) => {

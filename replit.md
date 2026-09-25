@@ -22,18 +22,18 @@ Measurement-driven kitchen concept designer backed by an Apex product catalog. G
 
 ## Production environment
 
-Copy `.env.example` into your deployment secret manager and replace every placeholder. Production startup intentionally fails if `APEX_ADMIN_KEY`, `RATE_LIMIT_SALT`, or required AI integration variables are missing.
+Configure the required production secrets before publishing. Production startup requires the AI integration variables and either `RATE_LIMIT_SALT` or `SESSION_SECRET`. The public catalog and designer run without an admin key; admin catalog operations remain unavailable until one is configured.
 
 Important:
-- `APEX_ADMIN_KEY` must be at least 32 random characters.
-- `RATE_LIMIT_SALT` must be at least 16 random characters.
+- `APEX_ADMIN_KEY` is optional for public access; if configured for private admin actions, it must be at least 32 random characters.
+- `RATE_LIMIT_SALT` should be at least 16 random characters. When absent, the existing `SESSION_SECRET` is used to hash rate-limit identifiers.
 - Never expose either secret as a `VITE_*` variable.
 - Leave `ALLOWED_ORIGINS` empty for same-origin-only deployments. Set it to a comma-separated allowlist only when needed.
 - Set `TRUST_PROXY_HOPS` to the number of trusted reverse proxies in front of Express.
 
 ## Security model
 
-- `/api/products*` and `/api/catalog-summary` require `Authorization: Bearer <APEX_ADMIN_KEY>`.
+- `/api/catalog/products` permits public browsing and limited demo-product submissions. `/api/products*` and `/api/catalog-summary` require `Authorization: Bearer <APEX_ADMIN_KEY>` and are unavailable when the key is not configured.
 - The Catalog page asks for the admin key and stores it only in `sessionStorage`, so closing the browser tab clears it.
 - Public design responses omit internal product cost, stock quantity, and internal notes.
 - Design and image-generation endpoints use PostgreSQL-backed hashed rate limits, which survive restarts and work across multiple app instances.

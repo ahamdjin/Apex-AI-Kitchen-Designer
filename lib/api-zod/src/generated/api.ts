@@ -95,6 +95,93 @@ export const CreateProductResponse = zod.object({
 }))
 
 
+/**
+ * @summary List public product catalog fields
+ */
+export const ListPublicProductsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "sku": zod.string(),
+  "name": zod.string(),
+  "category": zod.enum(['base_cabinet', 'wall_cabinet', 'tall_cabinet', 'countertop', 'island', 'accessory']),
+  "collection": zod.string().nullish(),
+  "finish": zod.string().nullish(),
+  "material": zod.string().nullish(),
+  "widthIn": zod.number().nullish(),
+  "heightIn": zod.number().nullish(),
+  "depthIn": zod.number().nullish(),
+  "lengthIn": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "unit": zod.string().nullish(),
+  "status": zod.enum(['demo', 'verified', 'inactive']),
+  "productUrl": zod.string().nullish()
+})
+export const ListPublicProductsResponse = zod.array(ListPublicProductsResponseItem)
+
+
+/**
+ * @summary Submit a demo product to the public catalog
+ */
+export const createPublicProductBodySkuMax = 100;
+
+export const createPublicProductBodyNameMax = 200;
+
+export const createPublicProductBodyCollectionMax = 120;
+
+export const createPublicProductBodyFinishMax = 120;
+
+export const createPublicProductBodyMaterialMax = 120;
+
+export const createPublicProductBodyWidthInMin = 0.001;
+
+export const createPublicProductBodyHeightInMin = 0.001;
+
+export const createPublicProductBodyDepthInMin = 0.001;
+
+export const createPublicProductBodyLengthInMin = 0.001;
+
+export const createPublicProductBodyPriceMin = 0.001;
+
+export const createPublicProductBodyUnitMax = 30;
+
+export const createPublicProductBodyProductUrlMax = 500;
+
+
+
+export const CreatePublicProductBody = zod.object({
+  "sku": zod.string().min(1).max(createPublicProductBodySkuMax),
+  "name": zod.string().min(1).max(createPublicProductBodyNameMax),
+  "category": zod.enum(['base_cabinet', 'wall_cabinet', 'tall_cabinet', 'countertop', 'island', 'accessory']),
+  "collection": zod.string().max(createPublicProductBodyCollectionMax).optional(),
+  "finish": zod.string().max(createPublicProductBodyFinishMax).optional(),
+  "material": zod.string().max(createPublicProductBodyMaterialMax).optional(),
+  "widthIn": zod.number().min(createPublicProductBodyWidthInMin).nullish(),
+  "heightIn": zod.number().min(createPublicProductBodyHeightInMin).nullish(),
+  "depthIn": zod.number().min(createPublicProductBodyDepthInMin).nullish(),
+  "lengthIn": zod.number().min(createPublicProductBodyLengthInMin).nullish(),
+  "price": zod.number().min(createPublicProductBodyPriceMin).nullish(),
+  "unit": zod.string().max(createPublicProductBodyUnitMax).optional(),
+  "productUrl": zod.string().max(createPublicProductBodyProductUrlMax).optional()
+})
+
+export const CreatePublicProductResponse = zod.object({
+  "id": zod.number().int(),
+  "sku": zod.string(),
+  "name": zod.string(),
+  "category": zod.enum(['base_cabinet', 'wall_cabinet', 'tall_cabinet', 'countertop', 'island', 'accessory']),
+  "collection": zod.string().nullish(),
+  "finish": zod.string().nullish(),
+  "material": zod.string().nullish(),
+  "widthIn": zod.number().nullish(),
+  "heightIn": zod.number().nullish(),
+  "depthIn": zod.number().nullish(),
+  "lengthIn": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "unit": zod.string().nullish(),
+  "status": zod.enum(['demo', 'verified', 'inactive']),
+  "productUrl": zod.string().nullish()
+})
+
+
 export const UpdateProductParams = zod.object({
   "id": zod.coerce.number().int()
 })

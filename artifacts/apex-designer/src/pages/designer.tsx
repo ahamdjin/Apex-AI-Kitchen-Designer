@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useDesignState } from "@/lib/design-state";
+import { normalizeDesignInput, useDesignState } from "@/lib/design-state";
 import { DesignerSidebar } from "@/components/designer/sidebar";
 import { DesignerCanvas } from "@/components/designer/canvas";
 import { DesignerResults } from "@/components/designer/results";
@@ -60,7 +60,7 @@ export default function Designer() {
   const handleGenerate = () => {
     if (generationLocked.current) return;
     generationLocked.current = true;
-    const input = structuredClone(design);
+    const input = normalizeDesignInput(structuredClone(design));
     const epoch = ++generationEpoch.current;
     generatedInputRef.current = null;
     setGenerationError(null);

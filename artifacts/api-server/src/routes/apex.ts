@@ -1,15 +1,16 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, productsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import {
   CreateProductBody, CreateProductResponse, UpdateProductBody, UpdateProductParams,
   UpdateProductResponse, DeleteProductParams, DeleteProductResponse,
   ListProductsResponse, ImportProductsBody, ImportProductsResponse,
   GetCatalogSummaryResponse, GenerateDesignBody, GenerateDesignResponse,
   RenderDesignImageBody, RenderDesignImageResponse,
+  CreatePublicProductBody, CreatePublicProductResponse, ListPublicProductsResponse,
 } from "@workspace/api-zod";
 import { readCatalogCsv } from "../lib/catalog-csv";
-import { addAiNarrative, makeConcept } from "../lib/apex-design";
+import { addAiNarrative, makeConcept, normalizeDesignInput } from "../lib/apex-design";
 import { renderKitchenImage } from "../lib/apex-render";
 import { requireAdmin } from "../middlewares/admin-auth";
 import { consumeRateLimit } from "../lib/rate-limit";
@@ -124,16 +125,123 @@ function designError(input: {
   return null;
 }
 
-// Catalog data contains internal cost/stock fields and is admin-only.
-router.use("/products", requireAdmin);
-router.use("/catalog-summary", requireAdmin);
+const publicProductFields = [
+  "sku", "name", "category", "collection", "finish", "material",
+  "widthIn", "heightIn", "depthIn", "lengthIn", "price", "unit", "productUrl",
+] as const;
 
-router.get("/products", async (_req, res): Promise<void> => {
+type PublicProductRow = Pick<typeof productsTable.$inferSelect,
+  "id" | "sku" | "name" | "category" | "collection" | "finish" | "material" |
+  "widthIn" | "heightIn" | "depthIn" | "lengthIn" | "price" | "unit" | "status" | "productUrl">;
+
+function publicProduct(row: PublicProductRow) {
+  return {
+    id: row.id,
+    sku: row.sku,
+    name: row.name,
+    category: row.category,
+    collection: row.collection,
+    finish: row.finish,
+    material: row.material,
+    widthIn: row.widthIn,
+    heightIn: row.heightIn,
+    depthIn: row.depthIn,
+    lengthIn: row.lengthIn,
+    price: row.price,
+    unit: row.unit,
+    status: row.status,
+    productUrl: row.productUrl,
+  };
+}
+
+router.get("/catalog/products", async (_req, res): Promise<void> => {
+  const records = await db.select({
+    id: productsTable.id,
+    sku: productsTable.sku,
+    name: productsTable.name,
+    category: productsTable.category,
+    collection: productsTable.collection,
+    finish: productsTable.finish,
+    material: productsTable.material,
+    widthIn: productsTable.widthIn,
+    heightIn: productsTable.heightIn,
+    depthIn: productsTable.depthIn,
+    lengthIn: productsTable.lengthIn,
+    price: productsTable.price,
+    unit: productsTable.unit,
+    status: productsTable.status,
+    productUrl: productsTable.productUrl,
+  }).from(productsTable).where(ne(productsTable.status, "inactive")).orderBy(productsTable.id);
+  res.json(ListPublicProductsResponse.parse(records.map(publicProduct)));
+});
+
+router.post("/catalog/products", async (req, res): Promise<void> => {
+  if (!await enforceRateLimit(req, res, "public-catalog-create", parseLimit("PUBLIC_CATALOG_CREATE_RATE_LIMIT_PER_15M", 10))) return;
+  if (Buffer.byteLength(JSON.stringify(req.body ?? null), "utf8") > 12_000) {
+    res.status(413).json({ error: "Product submission is too large." });
+    return;
+  }
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    res.status(400).json({ error: "Product submission must be an object." });
+    return;
+  }
+  const unsupported = Object.keys(req.body).filter((key) => !(publicProductFields as readonly string[]).includes(key));
+  if (unsupported.length) {
+    res.status(400).json({ error: `Unsupported public product field: ${unsupported[0]}.` });
+    return;
+  }
+  const parsed = CreatePublicProductBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  if (!parsed.data.sku.trim() || !parsed.data.name.trim()) {
+    res.status(400).json({ error: "SKU and name must not be blank." });
+    return;
+  }
+  if (parsed.data.productUrl?.trim()) {
+    try {
+      const url = new URL(parsed.data.productUrl);
+      if (url.protocol !== "https:" && url.protocol !== "http:") {
+        res.status(400).json({ error: "productUrl must use http or https." });
+        return;
+      }
+    } catch {
+      res.status(400).json({ error: "productUrl must be a valid URL." });
+      return;
+    }
+  }
+  try {
+    const [record] = await db.insert(productsTable).values({
+      ...parsed.data,
+      status: "demo",
+    }).returning({
+      id: productsTable.id,
+      sku: productsTable.sku,
+      name: productsTable.name,
+      category: productsTable.category,
+      collection: productsTable.collection,
+      finish: productsTable.finish,
+      material: productsTable.material,
+      widthIn: productsTable.widthIn,
+      heightIn: productsTable.heightIn,
+      depthIn: productsTable.depthIn,
+      lengthIn: productsTable.lengthIn,
+      price: productsTable.price,
+      unit: productsTable.unit,
+      status: productsTable.status,
+      productUrl: productsTable.productUrl,
+    });
+    res.status(201).json(CreatePublicProductResponse.parse(publicProduct(record)));
+  } catch (error) {
+    req.log.warn({ error }, "Public product creation rejected");
+    res.status(409).json({ error: "SKU already exists or product data is invalid." });
+  }
+});
+
+router.get("/products", requireAdmin, async (_req, res): Promise<void> => {
   const records = await db.select().from(productsTable).orderBy(productsTable.id);
   res.json(ListProductsResponse.parse(records.map(visible)));
 });
 
-router.post("/products", async (req, res): Promise<void> => {
+router.post("/products", requireAdmin, async (req, res): Promise<void> => {
   const parsed = CreateProductBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const validationError = productError(parsed.data);
@@ -147,7 +255,7 @@ router.post("/products", async (req, res): Promise<void> => {
   }
 });
 
-router.patch("/products/:id", async (req, res): Promise<void> => {
+router.patch("/products/:id", requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateProductParams.safeParse(req.params);
   const body = UpdateProductBody.safeParse(req.body);
   if (!params.success || !body.success) { res.status(400).json({ error: "Invalid product id or fields." }); return; }
@@ -165,14 +273,14 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   }
 });
 
-router.delete("/products/:id", async (req, res): Promise<void> => {
+router.delete("/products/:id", requireAdmin, async (req, res): Promise<void> => {
   const params = DeleteProductParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: "Invalid product id." }); return; }
   const [record] = await db.delete(productsTable).where(eq(productsTable.id, params.data.id)).returning();
   res.json(DeleteProductResponse.parse({ deleted: !!record }));
 });
 
-router.post("/products/import", async (req, res): Promise<void> => {
+router.post("/products/import", requireAdmin, async (req, res): Promise<void> => {
   const body = ImportProductsBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: body.error.message }); return; }
   let parsed: ReturnType<typeof readCatalogCsv>;
@@ -209,7 +317,7 @@ router.post("/products/import", async (req, res): Promise<void> => {
   res.json(ImportProductsResponse.parse({ created, updated, errors }));
 });
 
-router.get("/catalog-summary", async (_req, res): Promise<void> => {
+router.get("/catalog-summary", requireAdmin, async (_req, res): Promise<void> => {
   const rows = await db.select().from(productsTable);
   res.json(GetCatalogSummaryResponse.parse({
     total: rows.length,
@@ -221,7 +329,7 @@ router.get("/catalog-summary", async (_req, res): Promise<void> => {
 });
 
 router.post("/designs/generate", async (req, res): Promise<void> => {
-  const parsed = GenerateDesignBody.safeParse(req.body);
+  const parsed = GenerateDesignBody.safeParse(normalizeDesignInput(req.body));
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const validationError = designError(parsed.data);
   if (validationError) { res.status(400).json({ error: validationError }); return; }
@@ -239,7 +347,7 @@ router.post("/designs/generate", async (req, res): Promise<void> => {
 });
 
 router.post("/designs/render", async (req, res): Promise<void> => {
-  const parsed = RenderDesignImageBody.safeParse(req.body);
+  const parsed = RenderDesignImageBody.safeParse(normalizeDesignInput(req.body));
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const validationError = designError(parsed.data);
   if (validationError) { res.status(400).json({ error: validationError }); return; }

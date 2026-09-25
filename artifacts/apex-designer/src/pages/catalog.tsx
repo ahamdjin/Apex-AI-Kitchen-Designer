@@ -6,9 +6,12 @@ import {
   useDeleteProduct,
   useImportProducts,
   useGetCatalogSummary,
+  useListPublicProducts,
   getListProductsQueryKey,
   getGetCatalogSummaryQueryKey,
-  Product
+  getListPublicProductsQueryKey,
+  Product,
+  type PublicProduct,
 } from "@workspace/api-client-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +30,7 @@ import { ProductForm } from "@/components/catalog/product-form";
 import { ImportDialog } from "@/components/catalog/import-dialog";
 import { formatCurrency } from "@/lib/utils";
 import { clearAdminToken, getAdminToken, saveAdminToken } from "@/lib/admin-auth";
+import { PublicProductForm } from "@/components/catalog/public-product-form";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
@@ -36,8 +40,17 @@ export default function Catalog() {
   const [adminToken, setAdminToken] = useState(() => getAdminToken() ?? "");
   const [tokenDraft, setTokenDraft] = useState("");
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [adminAccessOpen, setAdminAccessOpen] = useState(false);
+  const [publicFormOpen, setPublicFormOpen] = useState(false);
   const queryClient = useQueryClient();
   const hasAdminToken = adminToken.length > 0;
+  const {
+    data: publicProducts = [],
+    isLoading: publicLoading,
+    error: publicError,
+  } = useListPublicProducts({
+    query: { queryKey: getListPublicProductsQueryKey(), refetchOnMount: "always" },
+  });
 
   const {
     data: products = [],
@@ -84,6 +97,10 @@ export default function Catalog() {
     queryClient.removeQueries({ queryKey: getListProductsQueryKey() });
     queryClient.removeQueries({ queryKey: getGetCatalogSummaryQueryKey() });
   };
+  const filteredPublicProducts = publicProducts.filter((product: PublicProduct) =>
+    product.name.toLowerCase().includes(search.toLowerCase()) ||
+    product.sku.toLowerCase().includes(search.toLowerCase())
+  );
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -92,28 +109,91 @@ export default function Catalog() {
 
   if (!hasAdminToken) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center p-6">
-        <form onSubmit={unlockCatalog} className="w-full max-w-md space-y-5 border bg-card p-6 shadow-sm">
+      <div className="mx-auto w-full max-w-[1400px] space-y-8 p-6 md:p-10">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <div className="mb-3 flex size-10 items-center justify-center border bg-muted">
-              <LockKeyhole className="size-5" />
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Catalog Admin</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Enter the server-side admin key. It is kept only in this browser tab.
-            </p>
+            <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">Apex Kitchen Designer</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight">Product Catalog</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Browse cabinet, countertop, and accessory offerings, or submit a product for review.</p>
           </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setPublicFormOpen(true)}>
+              <Plus className="mr-2 size-4" />
+              Add Product
+            </Button>
+            <Button variant="outline" onClick={() => setAdminAccessOpen((open) => !open)}>
+              <LockKeyhole className="mr-2 size-4" />
+              Admin
+            </Button>
+          </div>
+        </div>
+
+        {adminAccessOpen && (
+          <form onSubmit={unlockCatalog} className="ml-auto flex max-w-xl flex-col gap-3 border bg-card p-4 shadow-sm sm:flex-row">
+            <Input
+              type="password"
+              autoComplete="off"
+              value={tokenDraft}
+              onChange={(event) => setTokenDraft(event.target.value)}
+              placeholder="Server-side admin key"
+              aria-label="Admin key"
+            />
+            <Button type="submit">Unlock</Button>
+            {authMessage && <p role="alert" className="basis-full text-sm text-destructive">{authMessage}</p>}
+          </form>
+        )}
+
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            type="password"
-            autoComplete="off"
-            value={tokenDraft}
-            onChange={(event) => setTokenDraft(event.target.value)}
-            placeholder="Admin key"
-            aria-label="Admin key"
+            placeholder="Search by SKU or name..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="pl-9"
           />
-          {authMessage && <p role="alert" className="text-sm text-destructive">{authMessage}</p>}
-          <Button type="submit" className="w-full">Unlock catalog</Button>
-        </form>
+        </div>
+
+        {publicError ? (
+          <div role="alert" className="border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
+            The public catalog could not be loaded. Please try again.
+          </div>
+        ) : publicLoading ? (
+          <div className="border bg-card p-10 text-center text-sm text-muted-foreground">Loading catalog...</div>
+        ) : filteredPublicProducts.length === 0 ? (
+          <div className="border bg-card p-10 text-center text-sm text-muted-foreground">No products found. Add the first product to get started.</div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredPublicProducts.map((product) => (
+              <article key={product.id} className="space-y-4 border bg-card p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-xs text-muted-foreground">{product.sku}</p>
+                    <h2 className="mt-1 font-semibold">{product.name}</h2>
+                  </div>
+                  <Badge variant={product.status === "verified" ? "default" : "outline"} className="capitalize">{product.status}</Badge>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant="secondary" className="capitalize">{product.category.replaceAll("_", " ")}</Badge>
+                  {product.collection && <Badge variant="outline">{product.collection}</Badge>}
+                </div>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  {(product.finish || product.material) && <p>{[product.finish, product.material].filter(Boolean).join(" · ")}</p>}
+                  <p>
+                    {product.widthIn ? `${product.widthIn}" W` : ""}
+                    {product.heightIn ? ` × ${product.heightIn}" H` : ""}
+                    {product.depthIn ? ` × ${product.depthIn}" D` : ""}
+                    {product.lengthIn ? ` × ${product.lengthIn}" L` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between border-t pt-3">
+                  <span className="text-xs text-muted-foreground">{product.unit || "each"}</span>
+                  <span className="font-semibold">{product.price != null ? formatCurrency(product.price) : "Price on request"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+        <PublicProductForm open={publicFormOpen} onOpenChange={setPublicFormOpen} />
       </div>
     );
   }

@@ -1,0 +1,1 @@
+- [Public catalog contributions](public-catalog-contributions.md) — accept public submissions without granting admin access; keep their status distinct from reviewed inventory.

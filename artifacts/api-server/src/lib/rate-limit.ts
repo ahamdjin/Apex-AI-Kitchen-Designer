@@ -21,7 +21,7 @@ export async function ensureRateLimitTable(): Promise<void> {
 }
 
 function hashKey(scope: string, key: string): string {
-  const salt = process.env.RATE_LIMIT_SALT?.trim() || "development-only-rate-limit-salt";
+  const salt = process.env.RATE_LIMIT_SALT?.trim() || process.env.SESSION_SECRET?.trim() || "development-only-rate-limit-salt";
   return createHash("sha256").update(`${salt}\0${scope}\0${key}`).digest("hex");
 }
 
