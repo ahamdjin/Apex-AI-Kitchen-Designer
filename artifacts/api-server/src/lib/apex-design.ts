@@ -10,13 +10,14 @@ export function makeConcept(input: Design, catalog: ProductRecord[]) {
   const modules: Module[] = [];
   const selected = new Map<number, ProductRecord>();
   const active = catalog.filter(p => p.status !== "inactive");
-  const wallKeys = input.layout === "u" ? ["A", "B", "C"] :
+  const cabinetWallKeys = input.layout === "u" ? ["A", "B", "C"] :
     input.layout === "single" ? ["A"] : input.layout === "open" ? [] : ["A", "B"];
+  const featureWallKeys = input.layout === "open" ? ["A"] : cabinetWallKeys;
 
   if (input.ceilingIn < 72 || input.ceilingIn > 180 || input.roomDepthIn < 72 || input.roomDepthIn > 600) {
     throw new Error("Enter a ceiling height from 72–180 in and room depth from 72–600 in.");
   }
-  for (const wall of wallKeys) {
+  for (const wall of cabinetWallKeys) {
     const length = input.walls[wall];
     if (!Number.isFinite(length) || length < 60 || length > 600) {
       throw new Error(`${wall} must be between 60 and 600 inches.`);
@@ -27,7 +28,7 @@ export function makeConcept(input: Design, catalog: ProductRecord[]) {
   }
   for (const item of [...input.windows, ...input.openings, ...input.fixtures]) {
     const length = input.walls[item.wall];
-    if (!wallKeys.includes(item.wall) || !Number.isFinite(item.offsetIn) ||
+    if (!featureWallKeys.includes(item.wall) || !Number.isFinite(item.offsetIn) ||
       item.offsetIn < 0 || item.widthIn <= 0 || item.offsetIn + item.widthIn > length) {
       throw new Error(`A feature on ${item.wall} does not fit the selected wall.`);
     }
@@ -56,7 +57,7 @@ export function makeConcept(input: Design, catalog: ProductRecord[]) {
     }
   }
 
-  for (const wall of wallKeys) {
+  for (const wall of cabinetWallKeys) {
     const length = input.walls[wall];
     const blocked = input.openings.filter(o => o.wall === wall)
       .map(o => [o.offsetIn, o.offsetIn + o.widthIn]);
@@ -103,7 +104,8 @@ export function makeConcept(input: Design, catalog: ProductRecord[]) {
     warnings.push("A low window may interfere with a standard-height counter; verify on site.");
   }
   warnings.push("Concept only. Measurements, inventory, slab yield, code clearances and installation must be verified by Apex.");
-  const products = [...selected.values()].map(({ updatedAt: _updatedAt, ...product }) => product);
+  // Public design responses intentionally omit internal cost, stock and notes.
+  const products = [...selected.values()].map(({ updatedAt: _updatedAt, cost: _cost, stockQty: _stockQty, notes: _notes, ...product }) => product);
   const verified = products.length > 0 && products.every(p => p.status === "verified");
   if (!verified) warnings.unshift("Demo product records are illustrative and not confirmed for sale.");
   const units = modules.filter(m => m.productId);
